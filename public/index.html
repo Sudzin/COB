@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ЖУРНАЛ ИБ // АНАЛИЗАТОР</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/layout.css">
+<link rel="stylesheet" href="/css/file-list.css">
+<link rel="stylesheet" href="/css/controls.css">
+<link rel="stylesheet" href="/css/filters.css">
+<link rel="stylesheet" href="/css/log-table.css">
+<link rel="stylesheet" href="/css/stats.css">
+<link rel="stylesheet" href="/css/modal.css">
+<link rel="stylesheet" href="/css/print.css">
+</head>
+<body>
+<div class="modal-overlay" id="errModal">
+  <div class="modal-card">
+    <h3>[ОШИБКА ВВОДА ПАРАМЕТРОВ]</h3>
+    <p id="errModalText">Текст ошибки...</p>
+    <button class="btn-action" style="width:100%;" id="errModalClose">ПОНЯТНО / ИСПРАВИТЬ</button>
+  </div>
+</div>
+
+<header class="mast">
+  <div class="brand">ЖУРНАЛ ИБ // <span>АНАЛИЗАТОР</span></div>
+
+  <div class="nav-cluster">
+    <button type="button" class="nav-tab-btn active" id="tabBtnFile">СТАТИСТИКА ПО ФАЙЛАМ</button>
+    <button type="button" class="nav-tab-btn" id="tabBtnSummary">ОБЩАЯ СТАТИСТИКА</button>
+  </div>
+
+  <div class="status-badge"><span>●</span> СТАТУС: АКТИВЕН</div>
+</header>
+
+<main class="app-grid">
+  <!-- ЛЕВАЯ КОЛОНКА -->
+  <div>
+    <div class="panel">
+      <div class="panel-head">
+        <span>ЖУРНАЛЫ</span>
+        <span class="tag" id="filesCountLabel">// ФАЙЛОВ: 0</span>
+      </div>
+      <div class="file-list" id="filesContainer"></div>
+    </div>
+  </div>
+
+  <!-- ПРАВАЯ РАБОЧАЯ ОБЛАСТЬ -->
+  <div>
+    <div class="print-header" id="printReportHeader">
+      <h2 style="font-family:var(--f-serif); text-transform:uppercase; font-size:1.6rem; font-weight:700;">ОТЧЁТ ПО РЕЗУЛЬТАТАМ АУДИТА СИСТЕМНЫХ ЖУРНАЛОВ</h2>
+      <p style="font-size:.9rem;" id="printMetaDetails">Дата генерации: —</p>
+    </div>
+
+    <!-- Вкладка 1: статистика по файлу -->
+    <div id="tabContentFile">
+      <div class="panel panel--alt">
+        <div class="panel-head">
+          <span id="selectedFileTitle">ВЫБЕРИТЕ ФАЙЛ</span>
+          <span class="tag" id="selectedFileBadge">// СТАТУС</span>
+        </div>
+
+        <div id="fileDetailBox" style="display:none;">
+          <div class="metric-grid">
+            <div class="metric-card"><div class="lab">Всего строк лога</div><div class="val" id="fStatLines">0</div></div>
+            <div class="metric-card"><div class="lab">Неудачных попыток</div><div class="val warn" id="fStatFailures">0</div></div>
+            <div class="metric-card"><div class="lab">Успешных входов</div><div class="val" id="fStatAuths">0</div></div>
+            <div class="metric-card"><div class="lab">Превышений порога</div><div class="val warn" id="fStatAlerts">0</div></div>
+          </div>
+
+          <div class="filter-deck">
+            <div class="filter-row">
+              <div class="param-unit">
+                <label for="thresholdInput">Пороговое число сбоев</label>
+                <input type="text" class="ctl" id="thresholdInput" value="5" style="width:72px;">
+              </div>
+
+              <div class="param-unit">
+                <label for="windowInput">Временное окно</label>
+                <div class="seg" role="group" aria-label="Формат окна">
+                  <button type="button" id="segMin" class="on">Минуты</button>
+                  <button type="button" id="segHms">ЧЧ:ММ:СС</button>
+                </div>
+                <input type="text" class="ctl" id="windowInput" value="60" style="width:110px;">
+                <span class="hint" id="winMaxHint">макс: — мин</span>
+              </div>
+
+              <button class="btn-action" id="applyBtn">Применить</button>
+            </div>
+
+            <div id="fileFilters"></div>
+          </div>
+
+          <div class="log-table-wrap">
+            <table class="log-table">
+              <thead>
+                <tr>
+                  <th class="num">№</th>
+                  <th>Дата и время</th>
+                  <th>Узел</th>
+                  <th>Процесс</th>
+                  <th>Статус</th>
+                  <th>Пользователь</th>
+                  <th>IP-источник</th>
+                  <th>Порт</th>
+                  <th>Детали</th>
+                </tr>
+              </thead>
+              <tbody id="logTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="panel-head" style="margin-top:2.2rem;">
+            <span>ИТОГОВАЯ СТАТИСТИКА АКТИВНОСТИ IP</span>
+            <span class="tag">// СВОДКА ПО ФАЙЛУ</span>
+          </div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th style="width:180px;">IP источника</th>
+                <th style="width:120px;">Число сбоев</th>
+                <th style="width:90px;">Порог</th>
+                <th style="width:140px;">Статус</th>
+                <th>Информация системы / предупреждение</th>
+              </tr>
+            </thead>
+            <tbody id="ipSummaryBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Вкладка 2: общая статистика -->
+    <div id="tabContentSummary" style="display:none;">
+      <div class="panel panel--alt">
+        <div class="panel-head">
+          <span>ОБЩАЯ СТАТИСТИКА ПО ВСЕМ ЛОГАМ</span>
+          <span class="tag">// МАССОВЫЙ АУДИТ</span>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric-card"><div class="lab">Обработано файлов</div><div class="val" id="mTotalFiles">0</div></div>
+          <div class="metric-card"><div class="lab">Суммарно строк</div><div class="val" id="mTotalLines">0</div></div>
+          <div class="metric-card"><div class="lab">Всего сбоев входа</div><div class="val warn" id="mTotalFailures">0</div></div>
+          <div class="metric-card"><div class="lab">Файлов с атаками</div><div class="val warn" id="mFilesWithAlerts">0</div></div>
+        </div>
+
+        <div class="panel-head" style="margin-top:1rem;">
+          <span>ТАБЛИЦА РЕЗУЛЬТАТОВ ТЕСТИРОВАНИЯ</span>
+          <span class="tag">// СВОДНЫЙ ОТЧЁТ</span>
+        </div>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th style="width:100px;">Имя файла</th>
+              <th style="width:120px;">Наличие алерта</th>
+              <th style="width:150px;">Тест</th>
+              <th>Результат</th>
+              <th>Примечание</th>
+            </tr>
+          </thead>
+          <tbody id="summaryTableBody"></tbody>
+        </table>
+        <p class="tbl-note">Тест всегда выполняется при пороге 5 и полном окне, независимо от настроек выше. «Ожидалось» определено вручную по содержимому файла. «Из N» означает: IP — из всех IP со сбоями, сбои — из всех попыток входа (сбои + успешные).</p>
+
+        <div class="panel-head" style="margin-top:2.5rem;">
+          <span>ОБЩИЙ СПИСОК ЖУРНАЛОВ (ВСЕ ФАЙЛЫ)</span>
+          <span class="tag">// ПОТОК СОБЫТИЙ</span>
+        </div>
+
+        <div class="filter-deck">
+          <div id="allFilters"></div>
+        </div>
+
+        <div class="log-table-wrap">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th>Файл</th>
+                <th class="num">№</th>
+                <th>Дата и время</th>
+                <th>Узел</th>
+                <th>Процесс</th>
+                <th>Статус</th>
+                <th>Пользователь</th>
+                <th>IP-источник</th>
+                <th>Порт</th>
+                <th>Детали</th>
+              </tr>
+            </thead>
+            <tbody id="allLogsTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="more-row" id="allMoreRow" hidden>
+          <span class="fcount" id="allMoreInfo"></span>
+          <button type="button" class="btn-ghost" id="showMoreBtn">Показать ещё 300</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>

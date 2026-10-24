@@ -1,0 +1,36 @@
+/* file-list.css — список файлов слева */
+/* КАРТОЧКИ ФАЙЛОВ */
+.file-list{display:grid;gap:.8rem;}
+.file-item{
+  background:var(--paper);
+  border:2px solid var(--ink);
+  box-shadow:4px 4px 0 var(--ink);
+  padding:.7rem 1rem;
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:.8rem;
+  transition:transform .12s,box-shadow .12s,background .12s;
+}
+.file-item .fname{font:600 .88rem var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.file-item:hover{background:#fff;transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink);}
+.file-item.active{background:var(--ink);color:var(--paper);box-shadow:4px 4px 0 var(--copper);}
+.empty{padding:1rem;color:var(--muted);font-size:.9rem;}
+
+.badge{
+  font:700 .72rem var(--f-sans);
+  letter-spacing:.05em;
+  padding:.24rem 0;
+  border:2px solid currentColor;
+  display:inline-block;
+  text-align:center;
+  width:108px;
+  min-width:108px;
+  white-space:nowrap;
+}
+.badge.alert{color:var(--copper-deep);background:rgba(200,90,40,.08);}
+.file-item.active .badge.alert{color:var(--copper-hi);background:transparent;}
+.badge.clean{color:var(--teal);background:rgba(63,97,104,.06);}
+.file-item.active .badge.clean{color:var(--teal-hi);background:transparent;}
+.badge.err{color:var(--danger);}

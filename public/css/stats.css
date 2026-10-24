@@ -1,0 +1,32 @@
+/* stats.css — таблицы статистики и карточки метрик */
+/* ТАБЛИЦЫ СТАТИСТИКИ */
+.tbl{width:100%;border-collapse:collapse;font:400 .88rem var(--f-sans);margin-top:1rem;}
+.tbl th{background:var(--ink);color:var(--paper);text-align:left;padding:.7rem .9rem;text-transform:uppercase;font:700 .7rem var(--f-sans);letter-spacing:.08em;}
+.tbl td{padding:.65rem .9rem;border-bottom:1px solid rgba(28,29,26,.3);vertical-align:middle;}
+.tbl tr:hover td{background:rgba(200,90,40,.07);}
+.tbl .mono{font:700 .82rem var(--f-mono);}
+.pill{display:inline-block;padding:.15rem .55rem;border:2px solid currentColor;font:700 .72rem var(--f-sans);letter-spacing:.05em;white-space:nowrap;}
+.pill.bad{color:var(--copper-deep);}
+.pill.good{color:var(--teal);}
+.pill.err{color:var(--danger);}
+
+.tbl .sub{display:block;margin-top:.2rem;font-size:.78rem;color:var(--muted);}
+.tbl-note{margin-top:.7rem;font-size:.8rem;color:var(--muted);}
+.pill.na{color:var(--muted);}
+details.res summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:.5rem;font:600 .82rem var(--f-sans);padding:.2rem 0;}
+details.res summary::-webkit-details-marker{display:none;}
+details.res summary::before{content:'▸';font-size:.7rem;color:var(--copper-deep);transition:transform .12s;}
+details.res[open] summary::before{transform:rotate(90deg);}
+.tbl .mini{width:auto;min-width:340px;border-collapse:collapse;margin-top:.45rem;}
+.tbl .mini th{background:none;color:var(--teal);font:700 .64rem var(--f-sans);letter-spacing:.07em;text-transform:uppercase;padding:.25rem .9rem .25rem 0;border-bottom:1px solid rgba(26,28,24,.45);}
+.tbl .mini td{padding:.3rem .9rem .3rem 0;border-bottom:1px dashed rgba(26,28,24,.25);font-size:.82rem;}
+.tbl .mini .m-ok{color:var(--teal);font-weight:700;}
+.tbl .mini .m-bad{color:var(--copper-deep);font-weight:700;}
+.tbl .mini small{display:block;color:var(--muted);font-size:.7rem;}
+
+/* МЕТРИКИ */
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;}
+.metric-card{border:2px solid var(--ink);background:var(--paper);padding:.9rem;box-shadow:4px 4px 0 var(--ink);}
+.metric-card .lab{font:700 .7rem var(--f-sans);letter-spacing:.07em;color:var(--muted);text-transform:uppercase;}
+.metric-card .val{font:700 2.4rem/1 var(--f-serif);margin-top:.4rem;color:var(--ink);}
+.metric-card .val.warn{color:var(--copper-deep);}

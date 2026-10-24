@@ -1,0 +1,5 @@
+Oct 13 14:00:01 server sshd[100]: Accepted password for admin from 192.168.1.10
+Это не строка лога вообще
+Oct 13 14:05:22 server sshd[101]: Failed password for root from 10.0.0.5
+Oct 13 14:05:23 server sshd missing fields
+Oct 13 14:10:00 server systemd-logind: New session 5 of user test.

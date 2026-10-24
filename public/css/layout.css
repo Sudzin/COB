@@ -1,0 +1,69 @@
+/* layout.css — шапка, сетка, панели */
+/* ШАПКА */
+.mast{
+  background:var(--ink);
+  color:var(--paper);
+  padding:.9rem 2vw;
+  border-bottom:4px solid var(--copper);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:1rem;
+}
+.brand{font:700 1.9rem/1 var(--f-serif);letter-spacing:.02em;text-transform:uppercase;}
+.brand span{color:var(--copper-hi);}
+
+.nav-cluster{display:flex;align-items:center;gap:.6rem;}
+.nav-tab-btn{
+  background:transparent;
+  border:2px solid rgba(230,228,223,.3);
+  color:var(--paper);
+  padding:.55rem 1.1rem;
+  font:700 .8rem var(--f-sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  cursor:pointer;
+  transition:all .12s;
+}
+.nav-tab-btn:hover{border-color:var(--copper-hi);color:var(--copper-hi);}
+.nav-tab-btn.active{background:var(--copper);border-color:var(--copper);color:#fff;box-shadow:3px 3px 0 rgba(0,0,0,.5);}
+
+.status-badge{
+  font:700 .75rem var(--f-sans);
+  letter-spacing:.08em;
+  color:var(--teal-hi);
+  text-transform:uppercase;
+  border:1px solid rgba(143,181,189,.35);
+  padding:.45rem .8rem;
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+}
+
+/* СЕТКА */
+.app-grid{
+  display:grid;
+  grid-template-columns:360px minmax(0,1fr);
+  gap:2vw;
+  padding:1.8rem 2vw;
+  width:100%;
+}
+.app-grid > div{min-width:0;}
+@media (max-width:1100px){.app-grid{grid-template-columns:1fr;}}
+
+.panel{background:var(--paper-3);border:3px solid var(--ink);box-shadow:6px 6px 0 var(--ink);padding:1.4rem;margin-bottom:1.8rem;}
+.panel--alt{box-shadow:6px 6px 0 var(--copper);}
+.panel-head{
+  font:700 1.55rem/1.1 var(--f-serif);
+  text-transform:uppercase;
+  border-bottom:2px solid var(--ink);
+  padding-bottom:.6rem;
+  margin-bottom:1.1rem;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:.3rem 1rem;
+}
+.panel-head .tag{font:700 .75rem var(--f-sans);letter-spacing:.08em;color:var(--copper-deep);white-space:nowrap;}

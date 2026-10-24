@@ -1,0 +1,24 @@
+Oct 13 14:00:11 server sshd[4587]: Accepted password for admin from 192.168.1.12 port 44102 ssh2
+Oct 13 14:00:24 server systemd-logind[545]: New session 10 of user root.
+Oct 13 14:00:54 server sshd[3151]: Accepted password for mysql from 192.168.1.12 port 45148 ssh2
+Oct 13 14:01:07 server sshd[1623]: Failed password for admin from 10.0.0.5 port 47713 ssh2
+Oct 13 14:01:16 server sshd[1975]: Accepted password for test from 198.51.100.22 port 54815 ssh2
+Oct 13 14:01:35 server sshd[1450]: Accepted password for mysql from 192.168.1.11 port 46875 ssh2
+Oct 13 14:01:47 server sshd[4468]: Accepted password for nginx from 198.51.100.22 port 50322 ssh2
+Oct 13 14:02:02 server sshd[1203]: Accepted password for nginx from 198.51.100.22 port 52255 ssh2
+Oct 13 14:02:32 server sshd[3729]: Accepted password for root from 10.0.0.5 port 44218 ssh2
+Oct 13 14:02:53 server sshd[1538]: Accepted password for admin from 192.0.2.1 port 52445 ssh2
+Oct 13 14:02:56 server sshd[2275]: Accepted password for admin from 192.168.1.10 port 46196 ssh2
+Oct 13 14:03:16 server sshd[4342]: Accepted password for test from 10.0.0.5 port 43788 ssh2
+Oct 13 14:03:41 server sshd[1879]: Accepted password for user from 192.168.1.12 port 57138 ssh2
+Oct 13 14:03:51 server sshd[4903]: Accepted password for user from 203.0.113.45 port 51487 ssh2
+Oct 13 14:03:54 server systemd-logind[599]: New session 10 of user test.
+Oct 13 14:04:17 server sshd[2983]: Accepted password for user from 203.0.113.45 port 48335 ssh2
+Oct 13 14:04:36 server systemd-logind[843]: New session 10 of user guest.
+Oct 13 14:04:48 server systemd-logind[557]: New session 10 of user nginx.
+Oct 13 14:05:06 server sshd[4612]: Accepted password for nginx from 192.168.1.12 port 49883 ssh2
+Oct 13 14:05:19 server sshd[1966]: Accepted password for admin from 192.168.1.12 port 53504 ssh2
+Oct 13 14:05:46 server systemd-logind[758]: New session 10 of user user.
+Oct 13 14:05:53 server sshd[4634]: Accepted password for user from 192.0.2.1 port 54615 ssh2
+Oct 13 14:05:57 server sshd[2897]: Accepted password for guest from 192.168.1.11 port 51933 ssh2
+Oct 13 14:06:14 server sshd[1550]: Failed password for user from 192.168.1.10 port 43816 ssh2

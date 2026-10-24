@@ -1,0 +1,71 @@
+/* controls.css — кнопки, поля, параметры анализа */
+/* ЕДИНЫЕ ЭЛЕМЕНТЫ УПРАВЛЕНИЯ */
+.ctl{
+  height:38px;
+  padding:0 .7rem;
+  border:2px solid var(--ink);
+  border-radius:0;
+  background:var(--paper);
+  color:var(--ink);
+  font:600 .86rem/1 var(--f-sans);
+  outline:none;
+}
+.ctl:focus{border-color:var(--copper);background:#fff;}
+.ctl::placeholder{color:#8a8c84;font-weight:400;}
+
+.btn-action{
+  height:38px;
+  padding:0 1.1rem;
+  background:var(--copper);
+  color:#fff;
+  border:2px solid var(--ink);
+  font:700 .78rem var(--f-sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  cursor:pointer;
+  box-shadow:3px 3px 0 var(--ink);
+}
+.btn-action:hover{background:var(--copper-hi);}
+.btn-pdf{background:var(--ink);color:var(--paper);margin-left:auto;}
+.btn-pdf:hover{background:var(--copper-deep);color:#fff;}
+.btn-ghost{
+  height:32px;
+  padding:0 .8rem;
+  background:transparent;
+  color:var(--ink);
+  border:2px solid var(--ink);
+  font:700 .7rem var(--f-sans);
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+.btn-ghost:hover{background:var(--ink);color:var(--paper);}
+
+/* ПАРАМЕТРЫ */
+.filter-deck{
+  background:var(--paper-2);
+  border:2px solid var(--ink);
+  padding:1rem 1.1rem;
+  margin-bottom:1.2rem;
+  display:grid;
+  gap:1rem;
+}
+.filter-row{display:flex;flex-wrap:wrap;align-items:center;gap:.8rem 1.6rem;}
+.param-unit{display:flex;align-items:center;gap:.55rem;white-space:nowrap;}
+.param-unit label{font:700 .72rem var(--f-sans);letter-spacing:.07em;color:var(--teal);text-transform:uppercase;}
+.hint{font:500 .78rem var(--f-sans);color:var(--muted);}
+
+.seg{display:inline-flex;border:2px solid var(--ink);background:var(--paper);}
+.seg button{
+  height:34px;
+  padding:0 .85rem;
+  border:0;
+  background:transparent;
+  color:var(--ink);
+  font:600 .82rem var(--f-sans);
+  cursor:pointer;
+  white-space:nowrap;
+}
+.seg button + button{border-left:2px solid var(--ink);}
+.seg button:hover{background:#fff;}
+.seg button.on{background:var(--ink);color:var(--paper);}
