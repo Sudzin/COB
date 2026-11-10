@@ -1,0 +1,38 @@
+/* traffic.css — вкладка «Трафик» (ЛР №2): классификация, инциденты, графики */
+.app-grid.traffic-mode{grid-template-columns:minmax(0,1fr);}
+.app-grid.traffic-mode > div:first-child{display:none;}
+
+.tbl th.num,.tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.tbl td.num{font-family:var(--f-mono);font-size:.82rem;}
+.tbl-scroll{overflow-x:auto;}
+.tbl-flows td.mono{white-space:nowrap;}
+
+/* категории */
+.pill.cat-legit{color:var(--teal);}
+.pill.cat-scan{color:var(--copper-deep);}
+.pill.cat-synflood{color:var(--danger);}
+.pill.cat-icmp{color:#6b4c9a;}
+
+/* инциденты */
+.incident{border:2px solid var(--ink);border-left-width:8px;background:var(--paper);padding:.8rem 1rem;margin-bottom:.8rem;box-shadow:3px 3px 0 var(--ink);}
+.incident.inc-scan{border-left-color:var(--copper);}
+.incident.inc-synflood{border-left-color:var(--danger);}
+.incident.inc-icmp{border-left-color:#6b4c9a;}
+.inc-head{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin-bottom:.4rem;}
+.inc-head .mono{font:700 .85rem var(--f-mono);}
+.incident p{font-size:.9rem;}
+.inc-meta{margin-top:.4rem;font:500 .78rem var(--f-sans);color:var(--muted);}
+
+/* графики */
+.chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem;}
+.chart-box{border:2px solid var(--ink);background:var(--paper);padding:.8rem .9rem;box-shadow:4px 4px 0 var(--ink);}
+.chart-box.wide{grid-column:1 / -1;}
+.chart-box h4{font:700 .8rem var(--f-sans);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.5rem;}
+@media (max-width:900px){.chart-grid{grid-template-columns:1fr;}}
+.chart-svg{display:block;width:100%;height:auto;}
+.chart-svg--top{max-height:340px;}
+.chart-svg text{font:500 11px var(--f-mono);fill:var(--ink);}
+.chart-svg .cat{font-weight:700;}
+.chart-svg .ax-title{font:600 11px var(--f-sans);fill:var(--muted);}
+.chart-svg .grid{stroke:rgba(26,28,24,.16);stroke-width:1;}
+.chart-svg .axis{stroke:var(--ink);stroke-width:1.5;}

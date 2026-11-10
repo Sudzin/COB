@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="/css/log-table.css">
 <link rel="stylesheet" href="/css/stats.css">
 <link rel="stylesheet" href="/css/modal.css">
+<link rel="stylesheet" href="/css/traffic.css">
 <link rel="stylesheet" href="/css/print.css">
 </head>
 <body>
@@ -32,6 +33,7 @@
   <div class="nav-cluster">
     <button type="button" class="nav-tab-btn active" id="tabBtnFile">СТАТИСТИКА ПО ФАЙЛАМ</button>
     <button type="button" class="nav-tab-btn" id="tabBtnSummary">ОБЩАЯ СТАТИСТИКА</button>
+    <button type="button" class="nav-tab-btn" id="tabBtnTraffic">ТРАФИК</button>
   </div>
 
   <div class="status-badge"><span>●</span> СТАТУС: АКТИВЕН</div>
@@ -52,7 +54,7 @@
   <!-- ПРАВАЯ РАБОЧАЯ ОБЛАСТЬ -->
   <div>
     <div class="print-header" id="printReportHeader">
-      <h2 style="font-family:var(--f-serif); text-transform:uppercase; font-size:1.6rem; font-weight:700;">ОТЧЁТ ПО РЕЗУЛЬТАТАМ АУДИТА СИСТЕМНЫХ ЖУРНАЛОВ</h2>
+      <h2 id="printReportTitle" style="font-family:var(--f-serif); text-transform:uppercase; font-size:1.6rem; font-weight:700;">ОТЧЁТ ПО РЕЗУЛЬТАТАМ АУДИТА СИСТЕМНЫХ ЖУРНАЛОВ</h2>
       <p style="font-size:.9rem;" id="printMetaDetails">Дата генерации: —</p>
     </div>
 
@@ -130,6 +132,129 @@
             </thead>
             <tbody id="ipSummaryBody"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Вкладка 3: анализ сетевого трафика (ЛР №2) -->
+    <div id="tabContentTraffic" style="display:none;">
+      <div class="panel panel--alt">
+        <div class="panel-head">
+          <span>АНАЛИЗ СЕТЕВОГО ТРАФИКА</span>
+          <span class="tag" id="trafficFileTag">// ФАЙЛОВ: 0</span>
+        </div>
+
+        <div class="filter-deck">
+          <div class="filter-row">
+            <div class="param-unit">
+              <label for="pcapSelect">Файл захвата (.pcap)</label>
+              <select class="ctl" id="pcapSelect"></select>
+            </div>
+            <button class="btn-action" id="trafficReloadBtn">Обновить</button>
+            <button class="btn-action" id="trafficPdfBtn">Экспорт в PDF</button>
+          </div>
+        </div>
+
+        <div class="empty" id="trafficEmpty">Загрузка…</div>
+
+        <div id="trafficBody" style="display:none;">
+          <div class="metric-grid">
+            <div class="metric-card"><div class="lab">Пакетов</div><div class="val" id="tPackets">0</div></div>
+            <div class="metric-card"><div class="lab">Байт</div><div class="val" id="tBytes">0</div></div>
+            <div class="metric-card"><div class="lab">Потоков</div><div class="val" id="tFlows">0</div></div>
+            <div class="metric-card"><div class="lab">Длительность</div><div class="val" id="tDuration">0</div></div>
+            <div class="metric-card"><div class="lab">Инцидентов</div><div class="val warn" id="tIncidents">0</div></div>
+          </div>
+          <p class="tbl-note" id="trafficNote"></p>
+
+          <div class="panel-head" style="margin-top:1.4rem;">
+            <span>КЛАССИФИКАЦИЯ ТРАФИКА</span>
+            <span class="tag">// ГРУППЫ ПОТОКОВ</span>
+          </div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Категория</th>
+                <th class="num">Потоков</th>
+                <th class="num">Пакетов</th>
+                <th class="num">Байт</th>
+                <th class="num">Доля пакетов</th>
+              </tr>
+            </thead>
+            <tbody id="trafficCatBody"></tbody>
+          </table>
+
+          <div class="panel-head" style="margin-top:2rem;">
+            <span>ВЫЯВЛЕННЫЕ ИНЦИДЕНТЫ</span>
+            <span class="tag">// ЭВРИСТИКИ</span>
+          </div>
+          <div id="trafficIncidents"></div>
+
+          <div class="panel-head" style="margin-top:2rem;">
+            <span>ГРАФИЧЕСКИЕ ОТЧЁТЫ</span>
+            <span class="tag">// ВИЗУАЛИЗАЦИЯ</span>
+          </div>
+          <div class="chart-grid">
+            <div class="chart-box wide"><h4>Распределение размеров пакетов в захваченном трафике</h4><div id="chartHist"></div></div>
+            <div class="chart-box"><h4>Распределение пакетов по протоколам</h4><div id="chartProto"></div></div>
+            <div class="chart-box"><h4>Частота TCP-флагов</h4><div id="chartFlags"></div></div>
+            <div class="chart-box wide"><h4>Таймлайн активности: размер пакета во времени</h4><div id="chartTimeline"></div></div>
+            <div class="chart-box wide"><h4>Топ-10 самых активных потоков (по числу пакетов)</h4><div id="chartTop"></div></div>
+          </div>
+
+          <div class="panel-head" style="margin-top:2rem;">
+            <span>ТАБЛИЦА ПОТОКОВ</span>
+            <span class="tag">// ИТОГОВЫЙ ОТЧЁТ</span>
+          </div>
+          <div class="filter-deck">
+            <div class="filter-row">
+              <div class="param-unit">
+                <label for="trafficCatFilter">Категория</label>
+                <select class="ctl" id="trafficCatFilter">
+                  <option value="all">Все</option>
+                  <option value="legit">Легитимный</option>
+                  <option value="scan">Сканирование портов</option>
+                  <option value="synflood">SYN-флуд (DoS)</option>
+                  <option value="icmp">Аномалия ICMP</option>
+                </select>
+              </div>
+              <div class="param-unit">
+                <label for="trafficSort">Сортировка</label>
+                <select class="ctl" id="trafficSort">
+                  <option value="packets">По числу пакетов</option>
+                  <option value="bytes">По объёму</option>
+                  <option value="duration">По длительности</option>
+                  <option value="pps">По PPS</option>
+                  <option value="start">По времени начала</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <p class="fcount" id="trafficFlowCount" style="margin-top:.8rem;"></p>
+          <div class="tbl-scroll">
+            <table class="tbl tbl-flows">
+              <thead>
+                <tr>
+                  <th>Категория</th>
+                  <th>Прот.</th>
+                  <th>Поток (инициатор → ответчик)</th>
+                  <th class="num">Пакетов</th>
+                  <th class="num">Байт</th>
+                  <th class="num">Длит., с</th>
+                  <th class="num">PPS</th>
+                  <th class="num">BPS</th>
+                  <th class="num">SYN %</th>
+                  <th class="num">Ср. размер</th>
+                  <th class="num" title="SYN / ACK / RST / FIN">S/A/R/F</th>
+                </tr>
+              </thead>
+              <tbody id="trafficFlowBody"></tbody>
+            </table>
+          </div>
+          <p class="tbl-note">PPS и BPS не считаются («—») для потоков из одного пакета и короче 1 мс: деление на почти нулевую длительность даёт бессмысленные значения. Под числом пакетов: сколько прошло от инициатора (→) и от ответчика (←) — оба направления входят в один поток.</p>
+          <div class="more-row" id="trafficMoreRow" hidden>
+            <button type="button" class="btn-ghost" id="trafficMoreBtn">Показать ещё 100</button>
+          </div>
         </div>
       </div>
     </div>

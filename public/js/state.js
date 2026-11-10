@@ -1,4 +1,4 @@
-import { PAGE_STEP } from './constants.js';
+import { PAGE_STEP, TRAFFIC_PAGE_STEP } from './constants.js';
 
 /**
  * Единое хранилище состояния приложения.
@@ -7,10 +7,17 @@ import { PAGE_STEP } from './constants.js';
 export const store = {
   data: null,                 // ответ /api/scan
   currentFile: null,          // выбранный файл
-  activeTab: 'file',          // 'file' | 'summary'
+  activeTab: 'file',          // 'file' | 'summary' | 'traffic'
   threshold: 5,               // пороговое число сбоев
   windowMinutes: 60,          // временное окно (в минутах)
   winMode: 'MIN',             // формат ввода окна: 'MIN' | 'HMS'
   barFile: null,              // для какого файла сейчас настроена панель фильтров
-  allLimit: PAGE_STEP         // сколько строк показано в общем списке
+  allLimit: PAGE_STEP,        // сколько строк показано в общем списке
+
+  // ЛР №2 (трафик)
+  traffic: null,              // ответ /api/traffic
+  currentPcap: null,          // выбранный .pcap
+  trafficCategory: 'all',     // фильтр таблицы потоков по категории
+  trafficSort: 'packets',     // сортировка таблицы потоков
+  trafficLimit: TRAFFIC_PAGE_STEP // сколько потоков показано в таблице
 };

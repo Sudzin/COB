@@ -33,3 +33,19 @@
   .tbl tr{break-inside:avoid;}
 }
 .print-header{display:none;}
+
+/* ---- вкладка «Трафик» ---- */
+@media print{
+  .app-grid.traffic-mode{display:block!important;}
+  .chart-grid{display:block!important;}
+  .chart-box{break-inside:avoid;box-shadow:none!important;border:1px solid #000!important;background:#fff!important;margin-bottom:.7rem;padding:.4rem .6rem!important;}
+  .chart-box h4{font-size:9pt!important;}
+  .chart-svg{max-height:75mm;}
+  .chart-svg text{fill:#000!important;}
+  .incident{break-inside:avoid;box-shadow:none!important;border:1px solid #000!important;border-left-width:6px!important;background:#fff!important;}
+  .tbl-scroll{overflow:visible!important;}
+  .tbl-flows{font-size:7pt!important;}
+  .tbl-flows td,.tbl-flows th{padding:2px 4px!important;}
+  .tbl .num,.tbl td.num{font-size:7pt!important;}
+  .pill{border-width:1px!important;}
+}
