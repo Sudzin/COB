@@ -33,7 +33,7 @@ on('tabBtnFile', 'click', () => switchMainTab('file'));
 on('tabBtnSummary', 'click', () => switchMainTab('summary'));
 on('tabBtnTraffic', 'click', () => switchMainTab('traffic'));
 
-// вкладка «Трафик» (ЛР №2)
+// 2
 const rerenderFlows = () => {
   const cur = getCurrentPcap();
   if (cur) renderFlowTable(cur);

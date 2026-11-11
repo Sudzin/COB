@@ -4,10 +4,6 @@ const { LOGS_DIR, LOG_EXTENSIONS } = require('../config');
 const { readLogFileSafely } = require('./readLogFileSafely');
 const { analyzeLog } = require('./analyzeLog');
 
-/**
- * Сканирует папку logs/, читает и анализирует каждый .txt/.log файл.
- * Битый файл не останавливает работу: он попадает в список со статусом CORRUPTED.
- */
 function scanLogsDirectory() {
   if (!fs.existsSync(LOGS_DIR)) {
     return { status: 'DIR_NOT_FOUND', error: 'Папка "logs" не найдена рядом со скриптом.', files: [] };

@@ -1,0 +1,2169 @@
+diff --git a/README.md b/README.md
+index ee86aab..68b5c2f 100644
+--- a/README.md
++++ b/README.md
+@@ -39,6 +39,29 @@ npm start
+ 
+ В PowerShell: `$env:PORT=8080; npm start`.
+ 
++## ЛР №2: анализ сетевого трафика
++
++Вкладка **«Трафик»** анализирует захваты `.pcap` из папки `pcaps/` (`PCAPS_DIR`): разбирает пакеты (IPv4 + TCP/UDP/ICMP, остальное игнорируется), собирает потоки по пятёрке `(IP_src, IP_dst, Port_src, Port_dst, Protocol)`, считает пакеты, байты, длительность, PPS/BPS, долю SYN, средний размер и счётчики TCP-флагов (SYN/ACK/RST/FIN/PSH).
++
++- **Симметричные потоки:** A→B и B→A — один поток; «инициатор» — отправитель первого пакета, направления считаются отдельно (`→` / `←`).
++- **Классификация** (пороги — `TRAFFIC` в `src/config.js`): легитимный трафик, сканирование портов (много портов одного узла, по 1–2 пакета без ACK), SYN-флуд (SYN без ACK на один порт от многих источников), аномалии ICMP (echo на broadcast, крупные пакеты, нестандартные типы, высокая частота).
++- **Графики** (SVG, без библиотек): гистограмма размеров пакетов (лог. шкала), протоколы, TCP-флаги, таймлайн, топ-10 потоков. Кнопка «Экспорт в PDF» использует ту же печатную функцию, что и отчёты по логам.
++- PPS/BPS не считаются для потоков из одного пакета и короче 1 мс (в таблице «—»).
++- Форматы: `.pcap` (Ethernet, Raw IP, Linux cooked, BSD loopback). `.pcapng` не поддерживается — сохраните как pcap.
++
++### Живой захват и тестовый трафик
++
++Нужен `dumpcap` (идёт с Wireshark/Npcap) или `tcpdump`; на Windows — Npcap.
++
++```bash
++npm run capture -- --list                              # список интерфейсов
++npm run capture -- --iface "Ethernet 5" --count 500    # захват в pcaps/capture_*.pcap
++npm run capture -- --iface 4 --time 30                 # или не дольше 30 секунд
++npm run udp-burst -- --host 127.0.0.1 --count 5000     # пустые UDP, только localhost / частная сеть
++```
++
++Сценарии п. 8: `ping -n 20 8.8.8.8` (Linux/macOS: `ping -c 20 8.8.8.8`); `curl` к нескольким сайтам одновременно; `udp-burst`. Для loopback на Windows при установке Npcap включите «Support loopback traffic». Образец для проверки классификации: `pcaps/lab2_test_traffic.pcap`.
++
+ ## Структура проекта
+ 
+ ```
+@@ -48,6 +71,8 @@ log-analyzer/
+ ├── ROADMAP.md
+ ├── .gitignore
+ ├── logs/                          # входные логи (.txt / .log)
++├── pcaps/                         # захваты трафика (.pcap) для вкладки «Трафик»
++├── tools/                         # capture.js (живой захват), udp-burst.js (генератор UDP)
+ ├── tests/                         # тесты ядра
+ │   ├── parseDetailedLogLine.test.js
+ │   └── scanLogsDirectory.test.js
+@@ -59,7 +84,9 @@ log-analyzer/
+ │   │   ├── parseDetailedLogLine.js# разбор одной строки на поля
+ │   │   ├── analyzeLog.js          # разбор файла: строки, время, длительность
+ │   │   ├── scanLogsDirectory.js   # обход папки logs/
+-│   │   └── helpers/formatProto.js
++│   │   ├── helpers/formatProto.js
++│   │   └── pcap/                  # ЛР №2: parsePcap, parsePacket, normalizeFlowKey,
++│   │                              # aggregateFlows, computeFlowMetrics, classifyFlows, analyzePcap
+ │   └── server/                    # HTTP-слой
+ │       ├── index.js               # точка входа
+ │       ├── createServer.js        # маршрутизация
+@@ -97,6 +124,8 @@ log-analyzer/
+ 
+ ## API
+ 
++`GET /api/traffic` — анализ всех `.pcap` из `pcaps/` (потоки, категории, инциденты, данные для графиков).
++
+ `GET /api/scan` возвращает:
+ 
+ ```json
+diff --git a/package.json b/package.json
+index a371e1b..c491a3b 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,9 @@
+   "scripts": {
+     "start": "node src/server/index.js",
+     "dev": "node --watch src/server/index.js",
+-    "test": "node --test"
++    "test": "node --test",
++    "capture": "node tools/capture.js",
++    "udp-burst": "node tools/udp-burst.js"
+   },
+   "engines": {
+     "node": ">=18.11"
+diff --git a/pcaps/lab2_test_traffic.pcap b/pcaps/lab2_test_traffic.pcap
+new file mode 100644
+index 0000000000000000000000000000000000000000..f143ad2531121319776f556832eb8c631da86b66
+GIT binary patch
+literal 22654
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/public/css/print.css b/public/css/print.css
+index 8b3fb35..0aa7153 100644
+--- a/public/css/print.css
++++ b/public/css/print.css
+@@ -33,3 +33,19 @@
+   .tbl tr{break-inside:avoid;}
+ }
+ .print-header{display:none;}
++
++/* ---- вкладка «Трафик» ---- */
++@media print{
++  .app-grid.traffic-mode{display:block!important;}
++  .chart-grid{display:block!important;}
++  .chart-box{break-inside:avoid;box-shadow:none!important;border:1px solid #000!important;background:#fff!important;margin-bottom:.7rem;padding:.4rem .6rem!important;}
++  .chart-box h4{font-size:9pt!important;}
++  .chart-svg{max-height:75mm;}
++  .chart-svg text{fill:#000!important;}
++  .incident{break-inside:avoid;box-shadow:none!important;border:1px solid #000!important;border-left-width:6px!important;background:#fff!important;}
++  .tbl-scroll{overflow:visible!important;}
++  .tbl-flows{font-size:7pt!important;}
++  .tbl-flows td,.tbl-flows th{padding:2px 4px!important;}
++  .tbl .num,.tbl td.num{font-size:7pt!important;}
++  .pill{border-width:1px!important;}
++}
+diff --git a/public/css/traffic.css b/public/css/traffic.css
+new file mode 100644
+index 0000000..539e69f
+--- /dev/null
++++ b/public/css/traffic.css
+@@ -0,0 +1,38 @@
++/* traffic.css — вкладка «Трафик» (ЛР №2): классификация, инциденты, графики */
++.app-grid.traffic-mode{grid-template-columns:minmax(0,1fr);}
++.app-grid.traffic-mode > div:first-child{display:none;}
++
++.tbl th.num,.tbl td.num{text-align:right;font-variant-numeric:tabular-nums;}
++.tbl td.num{font-family:var(--f-mono);font-size:.82rem;}
++.tbl-scroll{overflow-x:auto;}
++.tbl-flows td.mono{white-space:nowrap;}
++
++/* категории */
++.pill.cat-legit{color:var(--teal);}
++.pill.cat-scan{color:var(--copper-deep);}
++.pill.cat-synflood{color:var(--danger);}
++.pill.cat-icmp{color:#6b4c9a;}
++
++/* инциденты */
++.incident{border:2px solid var(--ink);border-left-width:8px;background:var(--paper);padding:.8rem 1rem;margin-bottom:.8rem;box-shadow:3px 3px 0 var(--ink);}
++.incident.inc-scan{border-left-color:var(--copper);}
++.incident.inc-synflood{border-left-color:var(--danger);}
++.incident.inc-icmp{border-left-color:#6b4c9a;}
++.inc-head{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin-bottom:.4rem;}
++.inc-head .mono{font:700 .85rem var(--f-mono);}
++.incident p{font-size:.9rem;}
++.inc-meta{margin-top:.4rem;font:500 .78rem var(--f-sans);color:var(--muted);}
++
++/* графики */
++.chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem;}
++.chart-box{border:2px solid var(--ink);background:var(--paper);padding:.8rem .9rem;box-shadow:4px 4px 0 var(--ink);}
++.chart-box.wide{grid-column:1 / -1;}
++.chart-box h4{font:700 .8rem var(--f-sans);letter-spacing:.06em;text-transform:uppercase;margin-bottom:.5rem;}
++@media (max-width:900px){.chart-grid{grid-template-columns:1fr;}}
++.chart-svg{display:block;width:100%;height:auto;}
++.chart-svg--top{max-height:340px;}
++.chart-svg text{font:500 11px var(--f-mono);fill:var(--ink);}
++.chart-svg .cat{font-weight:700;}
++.chart-svg .ax-title{font:600 11px var(--f-sans);fill:var(--muted);}
++.chart-svg .grid{stroke:rgba(26,28,24,.16);stroke-width:1;}
++.chart-svg .axis{stroke:var(--ink);stroke-width:1.5;}
+diff --git a/public/index.html b/public/index.html
+index b367cdc..e7f56af 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -15,6 +15,7 @@
+ <link rel="stylesheet" href="/css/log-table.css">
+ <link rel="stylesheet" href="/css/stats.css">
+ <link rel="stylesheet" href="/css/modal.css">
++<link rel="stylesheet" href="/css/traffic.css">
+ <link rel="stylesheet" href="/css/print.css">
+ </head>
+ <body>
+@@ -32,6 +33,7 @@
+   <div class="nav-cluster">
+     <button type="button" class="nav-tab-btn active" id="tabBtnFile">СТАТИСТИКА ПО ФАЙЛАМ</button>
+     <button type="button" class="nav-tab-btn" id="tabBtnSummary">ОБЩАЯ СТАТИСТИКА</button>
++    <button type="button" class="nav-tab-btn" id="tabBtnTraffic">ТРАФИК</button>
+   </div>
+ 
+   <div class="status-badge"><span>●</span> СТАТУС: АКТИВЕН</div>
+@@ -52,7 +54,7 @@
+   <!-- ПРАВАЯ РАБОЧАЯ ОБЛАСТЬ -->
+   <div>
+     <div class="print-header" id="printReportHeader">
+-      <h2 style="font-family:var(--f-serif); text-transform:uppercase; font-size:1.6rem; font-weight:700;">ОТЧЁТ ПО РЕЗУЛЬТАТАМ АУДИТА СИСТЕМНЫХ ЖУРНАЛОВ</h2>
++      <h2 id="printReportTitle" style="font-family:var(--f-serif); text-transform:uppercase; font-size:1.6rem; font-weight:700;">ОТЧЁТ ПО РЕЗУЛЬТАТАМ АУДИТА СИСТЕМНЫХ ЖУРНАЛОВ</h2>
+       <p style="font-size:.9rem;" id="printMetaDetails">Дата генерации: —</p>
+     </div>
+ 
+@@ -134,6 +136,129 @@
+       </div>
+     </div>
+ 
++    <!-- Вкладка 3: анализ сетевого трафика (ЛР №2) -->
++    <div id="tabContentTraffic" style="display:none;">
++      <div class="panel panel--alt">
++        <div class="panel-head">
++          <span>АНАЛИЗ СЕТЕВОГО ТРАФИКА</span>
++          <span class="tag" id="trafficFileTag">// ФАЙЛОВ: 0</span>
++        </div>
++
++        <div class="filter-deck">
++          <div class="filter-row">
++            <div class="param-unit">
++              <label for="pcapSelect">Файл захвата (.pcap)</label>
++              <select class="ctl" id="pcapSelect"></select>
++            </div>
++            <button class="btn-action" id="trafficReloadBtn">Обновить</button>
++            <button class="btn-action" id="trafficPdfBtn">Экспорт в PDF</button>
++          </div>
++        </div>
++
++        <div class="empty" id="trafficEmpty">Загрузка…</div>
++
++        <div id="trafficBody" style="display:none;">
++          <div class="metric-grid">
++            <div class="metric-card"><div class="lab">Пакетов</div><div class="val" id="tPackets">0</div></div>
++            <div class="metric-card"><div class="lab">Байт</div><div class="val" id="tBytes">0</div></div>
++            <div class="metric-card"><div class="lab">Потоков</div><div class="val" id="tFlows">0</div></div>
++            <div class="metric-card"><div class="lab">Длительность</div><div class="val" id="tDuration">0</div></div>
++            <div class="metric-card"><div class="lab">Инцидентов</div><div class="val warn" id="tIncidents">0</div></div>
++          </div>
++          <p class="tbl-note" id="trafficNote"></p>
++
++          <div class="panel-head" style="margin-top:1.4rem;">
++            <span>КЛАССИФИКАЦИЯ ТРАФИКА</span>
++            <span class="tag">// ГРУППЫ ПОТОКОВ</span>
++          </div>
++          <table class="tbl">
++            <thead>
++              <tr>
++                <th>Категория</th>
++                <th class="num">Потоков</th>
++                <th class="num">Пакетов</th>
++                <th class="num">Байт</th>
++                <th class="num">Доля пакетов</th>
++              </tr>
++            </thead>
++            <tbody id="trafficCatBody"></tbody>
++          </table>
++
++          <div class="panel-head" style="margin-top:2rem;">
++            <span>ВЫЯВЛЕННЫЕ ИНЦИДЕНТЫ</span>
++            <span class="tag">// ЭВРИСТИКИ</span>
++          </div>
++          <div id="trafficIncidents"></div>
++
++          <div class="panel-head" style="margin-top:2rem;">
++            <span>ГРАФИЧЕСКИЕ ОТЧЁТЫ</span>
++            <span class="tag">// ВИЗУАЛИЗАЦИЯ</span>
++          </div>
++          <div class="chart-grid">
++            <div class="chart-box wide"><h4>Распределение размеров пакетов в захваченном трафике</h4><div id="chartHist"></div></div>
++            <div class="chart-box"><h4>Распределение пакетов по протоколам</h4><div id="chartProto"></div></div>
++            <div class="chart-box"><h4>Частота TCP-флагов</h4><div id="chartFlags"></div></div>
++            <div class="chart-box wide"><h4>Таймлайн активности: размер пакета во времени</h4><div id="chartTimeline"></div></div>
++            <div class="chart-box wide"><h4>Топ-10 самых активных потоков (по числу пакетов)</h4><div id="chartTop"></div></div>
++          </div>
++
++          <div class="panel-head" style="margin-top:2rem;">
++            <span>ТАБЛИЦА ПОТОКОВ</span>
++            <span class="tag">// ИТОГОВЫЙ ОТЧЁТ</span>
++          </div>
++          <div class="filter-deck">
++            <div class="filter-row">
++              <div class="param-unit">
++                <label for="trafficCatFilter">Категория</label>
++                <select class="ctl" id="trafficCatFilter">
++                  <option value="all">Все</option>
++                  <option value="legit">Легитимный</option>
++                  <option value="scan">Сканирование портов</option>
++                  <option value="synflood">SYN-флуд (DoS)</option>
++                  <option value="icmp">Аномалия ICMP</option>
++                </select>
++              </div>
++              <div class="param-unit">
++                <label for="trafficSort">Сортировка</label>
++                <select class="ctl" id="trafficSort">
++                  <option value="packets">По числу пакетов</option>
++                  <option value="bytes">По объёму</option>
++                  <option value="duration">По длительности</option>
++                  <option value="pps">По PPS</option>
++                  <option value="start">По времени начала</option>
++                </select>
++              </div>
++            </div>
++          </div>
++          <p class="fcount" id="trafficFlowCount" style="margin-top:.8rem;"></p>
++          <div class="tbl-scroll">
++            <table class="tbl tbl-flows">
++              <thead>
++                <tr>
++                  <th>Категория</th>
++                  <th>Прот.</th>
++                  <th>Поток (инициатор → ответчик)</th>
++                  <th class="num">Пакетов</th>
++                  <th class="num">Байт</th>
++                  <th class="num">Длит., с</th>
++                  <th class="num">PPS</th>
++                  <th class="num">BPS</th>
++                  <th class="num">SYN %</th>
++                  <th class="num">Ср. размер</th>
++                  <th class="num" title="SYN / ACK / RST / FIN">S/A/R/F</th>
++                </tr>
++              </thead>
++              <tbody id="trafficFlowBody"></tbody>
++            </table>
++          </div>
++          <p class="tbl-note">PPS и BPS не считаются («—») для потоков из одного пакета и короче 1 мс: деление на почти нулевую длительность даёт бессмысленные значения. Под числом пакетов: сколько прошло от инициатора (→) и от ответчика (←) — оба направления входят в один поток.</p>
++          <div class="more-row" id="trafficMoreRow" hidden>
++            <button type="button" class="btn-ghost" id="trafficMoreBtn">Показать ещё 100</button>
++          </div>
++        </div>
++      </div>
++    </div>
++
+     <!-- Вкладка 2: общая статистика -->
+     <div id="tabContentSummary" style="display:none;">
+       <div class="panel panel--alt">
+diff --git a/public/js/api/loadTraffic.js b/public/js/api/loadTraffic.js
+new file mode 100644
+index 0000000..f460794
+--- /dev/null
++++ b/public/js/api/loadTraffic.js
+@@ -0,0 +1,15 @@
++import { store } from '../state.js';
++import { renderTraffic } from '../traffic/renderTraffic.js';
++import { showErrorModal } from '../ui/showErrorModal.js';
++
++/** Запрашивает у сервера анализ всех .pcap и рисует вкладку «Трафик». */
++export async function loadTraffic() {
++  try {
++    const res = await fetch('/api/traffic');
++    if (!res.ok) throw new Error('HTTP ' + res.status);
++    store.traffic = await res.json();
++    renderTraffic();
++  } catch (e) {
++    showErrorModal('Не удалось получить данные о трафике (API недоступно).');
++  }
++}
+diff --git a/public/js/constants.js b/public/js/constants.js
+index d5af884..00f0ae3 100644
+--- a/public/js/constants.js
++++ b/public/js/constants.js
+@@ -13,3 +13,16 @@ export const STATUS_LABEL = {
+ };
+ 
+ export const STATUS_ORDER = ['Failed', 'Invalid', 'Accepted', 'Session', 'INFO'];
++
++// ---- ЛР №2: анализ трафика ----
++export const TRAFFIC_PAGE_STEP = 100;
++
++export const CATEGORY_ORDER = ['legit', 'scan', 'synflood', 'icmp'];
++export const CATEGORY_LABEL = {
++  legit: 'Легитимный',
++  scan: 'Сканирование портов',
++  synflood: 'SYN-флуд (DoS)',
++  icmp: 'Аномалия ICMP'
++};
++export const CATEGORY_COLOR = { legit: '#3f6168', scan: '#c85a28', synflood: '#ab1f1f', icmp: '#6b4c9a' };
++export const PROTO_COLOR = { TCP: '#c85a28', UDP: '#3f6168', ICMP: '#6b4c9a' };
+diff --git a/public/js/export/exportToPdf.js b/public/js/export/exportToPdf.js
+index 0452bbe..0a4d9d4 100644
+--- a/public/js/export/exportToPdf.js
++++ b/public/js/export/exportToPdf.js
+@@ -1,11 +1,13 @@
+ import { store } from '../state.js';
+ import { pad2 } from '../utils/pad2.js';
+ import { renderAllLogsTable } from '../render/renderAllLogsTable.js';
++import { renderFlowTable } from '../traffic/renderFlowTable.js';
++import { getCurrentPcap } from '../traffic/getCurrentPcap.js';
+ 
+ /**
+  * Экспорт отчёта в PDF через печать браузера («Сохранить как PDF»).
+  * Оформление печатной версии — в public/css/print.css.
+- * @param {'file' | 'summary'} scope  один файл или сводный отчёт
++ * @param {'file' | 'summary' | 'traffic'} scope  один файл, сводный отчёт или анализ трафика
+  */
+ export function exportToPdf(scope) {
+   const now = new Date();
+@@ -13,7 +15,15 @@ export function exportToPdf(scope) {
+     pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
+ 
+   const metaEl = document.getElementById('printMetaDetails');
+-  if (scope === 'file') {
++  const titleEl = document.getElementById('printReportTitle');
++  const oldHeading = titleEl.textContent;
++  const pcap = scope === 'traffic' ? getCurrentPcap() : null;
++  if (scope === 'traffic') {
++    if (!pcap) return;
++    titleEl.textContent = 'ОТЧЁТ ПО АНАЛИЗУ СЕТЕВОГО ТРАФИКА';
++    metaEl.textContent = 'Дата генерации: ' + nowStr + ' | Файл захвата: ' + pcap.fileName + ' | Пакетов: ' + pcap.totalPackets +
++      ' | Потоков: ' + pcap.totalFlows + ' | Инцидентов: ' + pcap.incidents.length;
++  } else if (scope === 'file') {
+     metaEl.textContent = 'Дата генерации: ' + nowStr + ' | Объект: ' + store.currentFile + ' | Порог: ' + store.threshold +
+       ' | Окно: ' + store.windowMinutes + ' мин. | ' + document.querySelector('#fileFilters .fcount').textContent;
+   } else {
+@@ -24,11 +34,16 @@ export function exportToPdf(scope) {
+   // в отчёт попадают все отфильтрованные строки, а не только первые 300
+   const oldTitle = document.title;
+   const oldLimit = store.allLimit;
+-  document.title = 'Отчёт ИБ — ' + (scope === 'file' ? store.currentFile : 'сводный');
++  const oldTrafficLimit = store.trafficLimit;
++  document.title = 'Отчёт ИБ — ' + (scope === 'file' ? store.currentFile : scope === 'traffic' ? 'трафик ' + pcap.fileName : 'сводный');
+   if (scope === 'summary') {
+     store.allLimit = Infinity;
+     renderAllLogsTable();
+   }
++  if (scope === 'traffic') {
++    store.trafficLimit = Infinity;
++    renderFlowTable(pcap);
++  }
+ 
+   // раскрываем «Показатели» на время печати
+   const dets = Array.from(document.querySelectorAll('details.res'));
+@@ -39,8 +54,11 @@ export function exportToPdf(scope) {
+     window.onafterprint = null;
+     dets.forEach((d, i) => { d.open = wasOpen[i]; });
+     document.title = oldTitle;
++    titleEl.textContent = oldHeading;
+     store.allLimit = oldLimit;
++    store.trafficLimit = oldTrafficLimit;
+     if (scope === 'summary') renderAllLogsTable();
++    if (scope === 'traffic') renderFlowTable(pcap);
+   };
+   window.print();
+ }
+diff --git a/public/js/main.js b/public/js/main.js
+index e4b04d9..c380c50 100644
+--- a/public/js/main.js
++++ b/public/js/main.js
+@@ -2,7 +2,7 @@
+  * Точка входа фронтенда: создаёт панели фильтров, навешивает обработчики, загружает данные.
+  */
+ import { store } from './state.js';
+-import { PAGE_STEP } from './constants.js';
++import { PAGE_STEP, TRAFFIC_PAGE_STEP } from './constants.js';
+ import { initFilterBars } from './filters/filterBars.js';
+ import { renderCurrentTable } from './render/renderCurrentTable.js';
+ import { renderAllLogsTable } from './render/renderAllLogsTable.js';
+@@ -13,6 +13,10 @@ import { validateAndReanalyze } from './ui/validateAndReanalyze.js';
+ import { closeErrorModal } from './ui/closeErrorModal.js';
+ import { showMoreAll } from './ui/showMoreAll.js';
+ import { loadData } from './api/loadData.js';
++import { loadTraffic } from './api/loadTraffic.js';
++import { renderTraffic } from './traffic/renderTraffic.js';
++import { renderFlowTable } from './traffic/renderFlowTable.js';
++import { getCurrentPcap } from './traffic/getCurrentPcap.js';
+ 
+ initFilterBars({
+   onFileChange: renderCurrentTable,
+@@ -27,6 +31,33 @@ const on = (id, event, handler) => document.getElementById(id).addEventListener(
+ 
+ on('tabBtnFile', 'click', () => switchMainTab('file'));
+ on('tabBtnSummary', 'click', () => switchMainTab('summary'));
++on('tabBtnTraffic', 'click', () => switchMainTab('traffic'));
++
++// вкладка «Трафик» (ЛР №2)
++const rerenderFlows = () => {
++  const cur = getCurrentPcap();
++  if (cur) renderFlowTable(cur);
++};
++on('pcapSelect', 'change', e => {
++  store.currentPcap = e.target.value;
++  store.trafficLimit = TRAFFIC_PAGE_STEP;
++  renderTraffic();
++});
++on('trafficCatFilter', 'change', e => {
++  store.trafficCategory = e.target.value;
++  store.trafficLimit = TRAFFIC_PAGE_STEP;
++  rerenderFlows();
++});
++on('trafficSort', 'change', e => {
++  store.trafficSort = e.target.value;
++  rerenderFlows();
++});
++on('trafficMoreBtn', 'click', () => {
++  store.trafficLimit += TRAFFIC_PAGE_STEP;
++  rerenderFlows();
++});
++on('trafficReloadBtn', 'click', loadTraffic);
++on('trafficPdfBtn', 'click', () => exportToPdf('traffic'));
+ on('segMin', 'click', () => setWinMode('MIN'));
+ on('segHms', 'click', () => setWinMode('HMS'));
+ on('applyBtn', 'click', validateAndReanalyze);
+diff --git a/public/js/state.js b/public/js/state.js
+index 02a3027..aca8b2d 100644
+--- a/public/js/state.js
++++ b/public/js/state.js
+@@ -1,4 +1,4 @@
+-import { PAGE_STEP } from './constants.js';
++import { PAGE_STEP, TRAFFIC_PAGE_STEP } from './constants.js';
+ 
+ /**
+  * Единое хранилище состояния приложения.
+@@ -7,10 +7,17 @@ import { PAGE_STEP } from './constants.js';
+ export const store = {
+   data: null,                 // ответ /api/scan
+   currentFile: null,          // выбранный файл
+-  activeTab: 'file',          // 'file' | 'summary'
++  activeTab: 'file',          // 'file' | 'summary' | 'traffic'
+   threshold: 5,               // пороговое число сбоев
+   windowMinutes: 60,          // временное окно (в минутах)
+   winMode: 'MIN',             // формат ввода окна: 'MIN' | 'HMS'
+   barFile: null,              // для какого файла сейчас настроена панель фильтров
+-  allLimit: PAGE_STEP         // сколько строк показано в общем списке
++  allLimit: PAGE_STEP,        // сколько строк показано в общем списке
++
++  // ЛР №2 (трафик)
++  traffic: null,              // ответ /api/traffic
++  currentPcap: null,          // выбранный .pcap
++  trafficCategory: 'all',     // фильтр таблицы потоков по категории
++  trafficSort: 'packets',     // сортировка таблицы потоков
++  trafficLimit: TRAFFIC_PAGE_STEP // сколько потоков показано в таблице
+ };
+diff --git a/public/js/traffic/charts/drawBars.js b/public/js/traffic/charts/drawBars.js
+new file mode 100644
+index 0000000..2349cce
+--- /dev/null
++++ b/public/js/traffic/charts/drawBars.js
+@@ -0,0 +1,38 @@
++import { esc } from '../../utils/esc.js';
++import { niceTicks } from '../../utils/niceTicks.js';
++import { noData } from './noData.js';
++
++const W = 360, H = 300, M = { l: 56, r: 12, t: 22, b: 44 };
++
++/**
++ * Столбчатая диаграмма. items: [{label, value, color}].
++ * percent: подписывать долю от суммы (для протоколов).
++ */
++export function drawBars(items, { yLabel = '', percent = false } = {}) {
++  const total = items.reduce((acc, it) => acc + it.value, 0);
++  if (!total) return noData();
++
++  const ticks = niceTicks(Math.max(...items.map(i => i.value)), 4);
++  const yMax = ticks[ticks.length - 1];
++  const pw = W - M.l - M.r, ph = H - M.t - M.b;
++  const base = M.t + ph;
++  const slot = pw / items.length;
++  const bw = Math.min(54, slot * 0.6);
++  const yOf = v => base - (v / yMax) * ph;
++
++  let g = '';
++  ticks.forEach(t => {
++    const y = yOf(t);
++    g += `<line x1="${M.l}" x2="${W - M.r}" y1="${y}" y2="${y}" class="grid"/><text x="${M.l - 6}" y="${y + 4}" text-anchor="end">${t}</text>`;
++  });
++  items.forEach((it, i) => {
++    const cx = M.l + slot * i + slot / 2, y = yOf(it.value);
++    g += `<rect x="${cx - bw / 2}" y="${y}" width="${bw}" height="${base - y}" fill="${it.color}"/>` +
++      `<text x="${cx}" y="${y - 5}" text-anchor="middle">${it.value}${percent ? ' (' + Math.round(it.value / total * 100) + '%)' : ''}</text>` +
++      `<text x="${cx}" y="${base + 16}" text-anchor="middle" class="cat">${esc(it.label)}</text>`;
++  });
++  g += `<line x1="${M.l}" x2="${M.l}" y1="${M.t}" y2="${base}" class="axis"/><line x1="${M.l}" x2="${W - M.r}" y1="${base}" y2="${base}" class="axis"/>` +
++    `<text transform="translate(13 ${M.t + ph / 2}) rotate(-90)" text-anchor="middle" class="ax-title">${esc(yLabel)}</text>`;
++
++  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" role="img">${g}</svg>`;
++}
+diff --git a/public/js/traffic/charts/drawHistogram.js b/public/js/traffic/charts/drawHistogram.js
+new file mode 100644
+index 0000000..20950c9
+--- /dev/null
++++ b/public/js/traffic/charts/drawHistogram.js
+@@ -0,0 +1,46 @@
++import { noData } from './noData.js';
++
++const W = 720, H = 320, M = { l: 64, r: 16, t: 16, b: 54 };
++
++/** Гистограмма размеров пакетов, ось Y — логарифмическая. */
++export function drawHistogram(sizes) {
++  if (!sizes.length) return noData();
++
++  let max = 0;
++  for (const s of sizes) if (s > max) max = s;
++  const BINS = 20;
++  const step = Math.max(1, Math.ceil((max + 1) / BINS));
++  const n = Math.floor(max / step) + 1;
++  const counts = new Array(n).fill(0);
++  for (const s of sizes) counts[Math.floor(s / step)]++;
++
++  const maxC = Math.max(...counts);
++  const yMin = 0.5;
++  const yTop = Math.max(10, 10 ** Math.ceil(Math.log10(maxC)));
++  const pw = W - M.l - M.r, ph = H - M.t - M.b;
++  const base = M.t + ph;
++  const yOf = c => M.t + ph * (1 - (Math.log(c) - Math.log(yMin)) / (Math.log(yTop) - Math.log(yMin)));
++  const bw = pw / n;
++
++  let g = '';
++  for (let v = 1; v <= yTop; v *= 10) {
++    const y = yOf(v);
++    g += `<line x1="${M.l}" x2="${W - M.r}" y1="${y}" y2="${y}" class="grid"/>` +
++      `<text x="${M.l - 6}" y="${y + 4}" text-anchor="end">${v}</text>`;
++  }
++  counts.forEach((c, i) => {
++    if (!c) return;
++    const x = M.l + i * bw, y = yOf(c);
++    g += `<rect x="${x + 1}" y="${y}" width="${Math.max(1, bw - 2)}" height="${base - y}" fill="#c85a28"><title>${i * step}–${(i + 1) * step - 1} Б: ${c}</title></rect>`;
++    if (bw > 20) g += `<text x="${x + bw / 2}" y="${y - 4}" text-anchor="middle">${c}</text>`;
++  });
++  const every = Math.ceil(n / 10);
++  for (let i = 0; i < n; i += every) {
++    g += `<text x="${M.l + i * bw}" y="${base + 16}" text-anchor="middle">${i * step}</text>`;
++  }
++  g += `<line x1="${M.l}" x2="${M.l}" y1="${M.t}" y2="${base}" class="axis"/><line x1="${M.l}" x2="${W - M.r}" y1="${base}" y2="${base}" class="axis"/>` +
++    `<text x="${M.l + pw / 2}" y="${H - 8}" text-anchor="middle" class="ax-title">Размер пакета (байты)</text>` +
++    `<text transform="translate(14 ${M.t + ph / 2}) rotate(-90)" text-anchor="middle" class="ax-title">Количество пакетов (log)</text>`;
++
++  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" role="img" aria-label="Гистограмма размеров пакетов">${g}</svg>`;
++}
+diff --git a/public/js/traffic/charts/drawScatter.js b/public/js/traffic/charts/drawScatter.js
+new file mode 100644
+index 0000000..0136aa5
+--- /dev/null
++++ b/public/js/traffic/charts/drawScatter.js
+@@ -0,0 +1,39 @@
++import { niceTicks } from '../../utils/niceTicks.js';
++import { PROTO_COLOR } from '../../constants.js';
++import { noData } from './noData.js';
++
++const W = 720, H = 340, M = { l: 64, r: 16, t: 28, b: 54 };
++
++/** Таймлайн: по X — время от начала захвата, по Y — размер пакета; цвет — протокол. */
++export function drawScatter(points, duration) {
++  if (!points.length) return noData();
++
++  const useMs = duration < 1;
++  const k = useMs ? 1000 : 1;
++  const unit = useMs ? 'мс' : 'с';
++  let maxT = 0, maxS = 0;
++  for (const p of points) { if (p.t > maxT) maxT = p.t; if (p.size > maxS) maxS = p.size; }
++
++  const xt = niceTicks(maxT * k || 1, 6), yt = niceTicks(maxS * 1.05, 5);
++  const xMax = xt[xt.length - 1], yMax = yt[yt.length - 1];
++  const pw = W - M.l - M.r, ph = H - M.t - M.b, base = M.t + ph;
++  const xOf = v => M.l + (v / xMax) * pw, yOf = v => base - (v / yMax) * ph;
++
++  let g = '';
++  yt.forEach(t => { g += `<line x1="${M.l}" x2="${W - M.r}" y1="${yOf(t)}" y2="${yOf(t)}" class="grid"/><text x="${M.l - 6}" y="${yOf(t) + 4}" text-anchor="end">${t}</text>`; });
++  xt.forEach(t => { g += `<text x="${xOf(t)}" y="${base + 16}" text-anchor="middle">${t}</text>`; });
++  for (const p of points) {
++    g += `<circle cx="${xOf(p.t * k).toFixed(1)}" cy="${yOf(p.size).toFixed(1)}" r="2.4" fill="${PROTO_COLOR[p.proto] || '#575952'}" fill-opacity=".6"/>`;
++  }
++  g += `<line x1="${M.l}" x2="${M.l}" y1="${M.t}" y2="${base}" class="axis"/><line x1="${M.l}" x2="${W - M.r}" y1="${base}" y2="${base}" class="axis"/>` +
++    `<text x="${M.l + pw / 2}" y="${H - 8}" text-anchor="middle" class="ax-title">Время от начала захвата (${unit})</text>` +
++    `<text transform="translate(14 ${M.t + ph / 2}) rotate(-90)" text-anchor="middle" class="ax-title">Размер пакета (байты)</text>`;
++
++  const present = [...new Set(points.map(p => p.proto))];
++  present.forEach((proto, i) => {
++    const x = W - M.r - 70 * (present.length - i);
++    g += `<circle cx="${x}" cy="12" r="4" fill="${PROTO_COLOR[proto] || '#575952'}"/><text x="${x + 8}" y="16">${proto}</text>`;
++  });
++
++  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" role="img" aria-label="Таймлайн активности">${g}</svg>`;
++}
+diff --git a/public/js/traffic/charts/drawTopFlows.js b/public/js/traffic/charts/drawTopFlows.js
+new file mode 100644
+index 0000000..a66e5f9
+--- /dev/null
++++ b/public/js/traffic/charts/drawTopFlows.js
+@@ -0,0 +1,31 @@
++import { esc } from '../../utils/esc.js';
++import { fmtNum } from '../../utils/fmtNum.js';
++import { fmtDuration } from '../../utils/fmtDuration.js';
++import { fmtEndpoint } from '../../utils/fmtEndpoint.js';
++import { CATEGORY_COLOR } from '../../constants.js';
++import { noData } from './noData.js';
++
++const W = 720, ROW = 28, LABEL_W = 250, VALUE_W = 190;
++
++/** Топ-10 самых активных потоков по числу пакетов; цвет — категория потока. */
++export function drawTopFlows(flows) {
++  const top = flows.slice().sort((a, b) => b.packets - a.packets || b.bytes - a.bytes).slice(0, 10);
++  if (!top.length) return noData();
++
++  const max = top[0].packets;
++  const barX = LABEL_W + 10, barW = W - barX - VALUE_W;
++  const H = top.length * ROW + 8;
++
++  const rows = top.map((f, i) => {
++    const y = 4 + i * ROW;
++    let label = f.proto + ' ' + fmtEndpoint(f.proto, f.src, f.sport) + ' → ' + fmtEndpoint(f.proto, f.dst, f.dport);
++    const full = label;
++    if (label.length > 40) label = label.slice(0, 39) + '…';
++    const w = Math.max(2, (f.packets / max) * barW);
++    return `<text x="${LABEL_W}" y="${y + 16}" text-anchor="end"><title>${esc(full)}</title>${esc(label)}</text>` +
++      `<rect x="${barX}" y="${y + 3}" width="${w}" height="${ROW - 8}" fill="${CATEGORY_COLOR[f.category]}"/>` +
++      `<text x="${W - 4}" y="${y + 16}" text-anchor="end">${fmtNum(f.packets)} пак · ${fmtNum(f.bytes)} Б · ${fmtDuration(f.duration)}</text>`;
++  }).join('');
++
++  return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg chart-svg--top" role="img" aria-label="Топ-10 потоков">${rows}</svg>`;
++}
+diff --git a/public/js/traffic/charts/noData.js b/public/js/traffic/charts/noData.js
+new file mode 100644
+index 0000000..83fcaa5
+--- /dev/null
++++ b/public/js/traffic/charts/noData.js
+@@ -0,0 +1,4 @@
++/** Заглушка вместо графика, когда рисовать нечего. */
++export function noData() {
++  return '<div class="empty">Нет данных для графика</div>';
++}
+diff --git a/public/js/traffic/getCurrentPcap.js b/public/js/traffic/getCurrentPcap.js
+new file mode 100644
+index 0000000..60419f8
+--- /dev/null
++++ b/public/js/traffic/getCurrentPcap.js
+@@ -0,0 +1,8 @@
++import { store } from '../state.js';
++
++/** Анализ выбранного .pcap (только успешно разобранный) или null. */
++export function getCurrentPcap() {
++  const files = store.traffic && store.traffic.files;
++  const cur = files && files.find(f => f.fileName === store.currentPcap);
++  return cur && cur.status === 'OK' ? cur : null;
++}
+diff --git a/public/js/traffic/renderFlowTable.js b/public/js/traffic/renderFlowTable.js
+new file mode 100644
+index 0000000..3d05ea0
+--- /dev/null
++++ b/public/js/traffic/renderFlowTable.js
+@@ -0,0 +1,48 @@
++import { store } from '../state.js';
++import { esc } from '../utils/esc.js';
++import { fmtNum } from '../utils/fmtNum.js';
++import { fmtRate } from '../utils/fmtRate.js';
++import { fmtEndpoint } from '../utils/fmtEndpoint.js';
++import { CATEGORY_LABEL } from '../constants.js';
++
++const SORTERS = {
++  packets: (a, b) => b.packets - a.packets || b.bytes - a.bytes,
++  bytes: (a, b) => b.bytes - a.bytes,
++  duration: (a, b) => b.duration - a.duration,
++  pps: (a, b) => (b.pps || 0) - (a.pps || 0),
++  start: (a, b) => a.start_time - b.start_time
++};
++
++/** Таблица потоков: фильтр по категории, сортировка, «показать ещё». */
++export function renderFlowTable(cur) {
++  let rows = cur.flows;
++  if (store.trafficCategory !== 'all') rows = rows.filter(f => f.category === store.trafficCategory);
++  rows = rows.slice().sort(SORTERS[store.trafficSort] || SORTERS.packets);
++
++  const shown = rows.slice(0, store.trafficLimit);
++  document.getElementById('trafficFlowBody').innerHTML = shown.map(rowHtml).join('') ||
++    '<tr><td colspan="11" class="empty">Нет потоков в выбранной категории</td></tr>';
++
++  const more = rows.length - shown.length;
++  document.getElementById('trafficFlowCount').innerHTML =
++    'Показано <b>' + fmtNum(shown.length) + '</b> из <b>' + fmtNum(rows.length) + '</b> потоков';
++  document.getElementById('trafficMoreRow').hidden = more <= 0;
++}
++
++function rowHtml(f) {
++  const syn = (f.syn_ratio * 100).toFixed(0) + '%';
++  const flow = esc(fmtEndpoint(f.proto, f.src, f.sport)) + ' → ' + esc(fmtEndpoint(f.proto, f.dst, f.dport));
++  return '<tr>' +
++    '<td><span class="pill cat-' + f.category + '" title="' + esc(f.reasons.join('; ')) + '">' + CATEGORY_LABEL[f.category] + '</span></td>' +
++    '<td>' + f.proto + '</td>' +
++    '<td class="mono">' + flow + '</td>' +
++    '<td class="num">' + fmtNum(f.packets) + '<span class="sub">' + fmtNum(f.fwd.packets) + ' → · ' + fmtNum(f.rev.packets) + ' ←</span></td>' +
++    '<td class="num">' + fmtNum(f.bytes) + '</td>' +
++    '<td class="num">' + f.duration.toFixed(3) + '</td>' +
++    '<td class="num">' + fmtRate(f.pps) + '</td>' +
++    '<td class="num">' + fmtRate(f.bps) + '</td>' +
++    '<td class="num">' + syn + '</td>' +
++    '<td class="num">' + f.avg_size.toFixed(1) + '</td>' +
++    '<td class="num">' + f.syn_count + '/' + f.ack_count + '/' + f.rst_count + '/' + f.fin_count + '</td>' +
++  '</tr>';
++}
+diff --git a/public/js/traffic/renderTraffic.js b/public/js/traffic/renderTraffic.js
+new file mode 100644
+index 0000000..1524faa
+--- /dev/null
++++ b/public/js/traffic/renderTraffic.js
+@@ -0,0 +1,49 @@
++import { store } from '../state.js';
++import { esc } from '../utils/esc.js';
++import { getCurrentPcap } from './getCurrentPcap.js';
++import { renderTrafficSummary } from './renderTrafficSummary.js';
++import { renderTrafficCharts } from './renderTrafficCharts.js';
++import { renderFlowTable } from './renderFlowTable.js';
++
++/** Главная отрисовка вкладки «Трафик»: выбор файла, сводка, графики, таблица потоков. */
++export function renderTraffic() {
++  const data = store.traffic;
++  if (!data) return;
++
++  const emptyEl = document.getElementById('trafficEmpty');
++  const bodyEl = document.getElementById('trafficBody');
++  const select = document.getElementById('pcapSelect');
++  const showEmpty = text => {
++    emptyEl.textContent = text;
++    emptyEl.style.display = 'block';
++    bodyEl.style.display = 'none';
++  };
++
++  if (data.status !== 'SUCCESS') {
++    select.innerHTML = '';
++    document.getElementById('trafficFileTag').textContent = '// ФАЙЛОВ: 0';
++    return showEmpty(data.error || 'Нет данных');
++  }
++
++  select.innerHTML = data.files
++    .map(f => '<option value="' + esc(f.fileName) + '">' + esc(f.fileName) + (f.status === 'OK' ? '' : ' (ошибка)') + '</option>')
++    .join('');
++  if (!data.files.some(f => f.fileName === store.currentPcap)) {
++    const firstOk = data.files.find(f => f.status === 'OK') || data.files[0];
++    store.currentPcap = firstOk.fileName;
++  }
++  select.value = store.currentPcap;
++  document.getElementById('trafficFileTag').textContent = '// ФАЙЛОВ: ' + data.files.length;
++
++  const cur = getCurrentPcap();
++  if (!cur) {
++    const bad = data.files.find(f => f.fileName === store.currentPcap);
++    return showEmpty('Файл не разобран: ' + (bad && bad.error ? bad.error : 'неизвестная ошибка'));
++  }
++
++  emptyEl.style.display = 'none';
++  bodyEl.style.display = 'block';
++  renderTrafficSummary(cur);
++  renderTrafficCharts(cur);
++  renderFlowTable(cur);
++}
+diff --git a/public/js/traffic/renderTrafficCharts.js b/public/js/traffic/renderTrafficCharts.js
+new file mode 100644
+index 0000000..d0af4e3
+--- /dev/null
++++ b/public/js/traffic/renderTrafficCharts.js
+@@ -0,0 +1,24 @@
++import { PROTO_COLOR } from '../constants.js';
++import { drawHistogram } from './charts/drawHistogram.js';
++import { drawBars } from './charts/drawBars.js';
++import { drawScatter } from './charts/drawScatter.js';
++import { drawTopFlows } from './charts/drawTopFlows.js';
++
++const FLAG_COLOR = { SYN: '#ab1f1f', ACK: '#3f6168', PSH: '#c85a28', RST: '#6b4c9a', FIN: '#575952' };
++
++/** Четыре графика вкладки «Трафик» (SVG, без внешних библиотек). */
++export function renderTrafficCharts(cur) {
++  const put = (id, html) => { document.getElementById(id).innerHTML = html; };
++
++  put('chartHist', drawHistogram(cur.sizes));
++  put('chartProto', drawBars(
++    Object.entries(cur.protocols).map(([label, value]) => ({ label, value, color: PROTO_COLOR[label] })),
++    { yLabel: 'Количество пакетов', percent: true }
++  ));
++  put('chartFlags', drawBars(
++    Object.entries(cur.flags).map(([label, value]) => ({ label, value, color: FLAG_COLOR[label] })),
++    { yLabel: 'Количество пакетов', percent: false }
++  ));
++  put('chartTimeline', drawScatter(cur.timeline, cur.duration));
++  put('chartTop', drawTopFlows(cur.flows));
++}
+diff --git a/public/js/traffic/renderTrafficSummary.js b/public/js/traffic/renderTrafficSummary.js
+new file mode 100644
+index 0000000..ce4513f
+--- /dev/null
++++ b/public/js/traffic/renderTrafficSummary.js
+@@ -0,0 +1,45 @@
++import { esc } from '../utils/esc.js';
++import { fmtNum } from '../utils/fmtNum.js';
++import { fmtDuration } from '../utils/fmtDuration.js';
++import { CATEGORY_ORDER, CATEGORY_LABEL } from '../constants.js';
++
++/** Карточки метрик, итоговая классификация по категориям и список инцидентов. */
++export function renderTrafficSummary(cur) {
++  const set = (id, v) => { document.getElementById(id).textContent = v; };
++  set('tPackets', fmtNum(cur.totalPackets));
++  set('tBytes', fmtNum(cur.totalBytes));
++  set('tFlows', fmtNum(cur.totalFlows));
++  set('tDuration', fmtDuration(cur.duration));
++  set('tIncidents', fmtNum(cur.incidents.length));
++
++  const notes = [];
++  if (cur.ignoredPackets > 0) notes.push('Пропущено пакетов без IP + TCP/UDP/ICMP: ' + fmtNum(cur.ignoredPackets) + '.');
++  if (cur.truncated) notes.push('Файл оборван на последней записи — разобрано то, что успело сохраниться.');
++  if (cur.sampled) notes.push('Точки на графиках прорежены (очень много пакетов); таблицы и счётчики считаются по всем.');
++  if (cur.flowsTruncated) notes.push('В таблице показаны самые крупные потоки; всего потоков: ' + fmtNum(cur.totalFlows) + '.');
++  document.getElementById('trafficNote').textContent = notes.join(' ');
++
++  document.getElementById('trafficCatBody').innerHTML = CATEGORY_ORDER.map(c => {
++    const s = cur.categories[c];
++    const share = cur.totalPackets ? (s.packets / cur.totalPackets * 100).toFixed(1) + '%' : '—';
++    return '<tr><td><span class="pill cat-' + c + '">' + CATEGORY_LABEL[c] + '</span></td>' +
++      '<td class="num">' + fmtNum(s.flows) + '</td><td class="num">' + fmtNum(s.packets) + '</td>' +
++      '<td class="num">' + fmtNum(s.bytes) + '</td><td class="num">' + share + '</td></tr>';
++  }).join('');
++
++  const box = document.getElementById('trafficIncidents');
++  if (!cur.incidents.length) {
++    box.innerHTML = '<div class="empty">Аномалий не обнаружено: весь трафик классифицирован как легитимный.</div>';
++    return;
++  }
++  const rel = t => '+' + fmtDuration(Math.max(0, t - cur.t0));
++  box.innerHTML = cur.incidents.map(i =>
++    '<div class="incident inc-' + i.type + '">' +
++      '<div class="inc-head"><span class="pill cat-' + i.type + '">' + esc(i.title) + '</span>' +
++      '<b class="mono">' + esc(i.src) + ' → ' + esc(i.dst) + '</b></div>' +
++      '<p>' + esc(i.description) + '</p>' +
++      '<div class="inc-meta">Потоков: ' + fmtNum(i.flows) + ' · Пакетов: ' + fmtNum(i.packets) +
++      ' · Интервал от начала захвата: ' + rel(i.start_time) + ' … ' + rel(i.end_time) + '</div>' +
++    '</div>'
++  ).join('');
++}
+diff --git a/public/js/ui/switchMainTab.js b/public/js/ui/switchMainTab.js
+index ea7cdce..3d4a479 100644
+--- a/public/js/ui/switchMainTab.js
++++ b/public/js/ui/switchMainTab.js
+@@ -1,12 +1,24 @@
+ import { store } from '../state.js';
+ import { renderAllLogsTable } from '../render/renderAllLogsTable.js';
++import { renderTraffic } from '../traffic/renderTraffic.js';
++import { loadTraffic } from '../api/loadTraffic.js';
+ 
+-/** Переключает вкладки «Статистика по файлам» / «Общая статистика». */
++const TABS = { file: 'tabContentFile', summary: 'tabContentSummary', traffic: 'tabContentTraffic' };
++const BUTTONS = { file: 'tabBtnFile', summary: 'tabBtnSummary', traffic: 'tabBtnTraffic' };
++
++/** Переключает вкладки: «Статистика по файлам» / «Общая статистика» / «Трафик». */
+ export function switchMainTab(tab) {
+   store.activeTab = tab;
+-  document.getElementById('tabBtnFile').classList.toggle('active', tab === 'file');
+-  document.getElementById('tabBtnSummary').classList.toggle('active', tab === 'summary');
+-  document.getElementById('tabContentFile').style.display = tab === 'file' ? 'block' : 'none';
+-  document.getElementById('tabContentSummary').style.display = tab === 'summary' ? 'block' : 'none';
++  Object.keys(TABS).forEach(name => {
++    document.getElementById(BUTTONS[name]).classList.toggle('active', name === tab);
++    document.getElementById(TABS[name]).style.display = name === tab ? 'block' : 'none';
++  });
++  // у вкладки «Трафик» своя панель выбора файла, список логов слева не нужен
++  document.querySelector('.app-grid').classList.toggle('traffic-mode', tab === 'traffic');
++
+   if (tab === 'summary') renderAllLogsTable();
++  if (tab === 'traffic') {
++    if (store.traffic) renderTraffic();
++    else loadTraffic();
++  }
+ }
+diff --git a/public/js/utils/fmtDuration.js b/public/js/utils/fmtDuration.js
+new file mode 100644
+index 0000000..c8d8049
+--- /dev/null
++++ b/public/js/utils/fmtDuration.js
+@@ -0,0 +1,5 @@
++/** Секунды → "12.3 мс" или "4.52 с". */
++export function fmtDuration(sec) {
++  if (sec < 1) return (sec * 1000).toFixed(sec < 0.01 ? 2 : 1) + ' мс';
++  return sec.toFixed(2) + ' с';
++}
+diff --git a/public/js/utils/fmtEndpoint.js b/public/js/utils/fmtEndpoint.js
+new file mode 100644
+index 0000000..9e8ca12
+--- /dev/null
++++ b/public/js/utils/fmtEndpoint.js
+@@ -0,0 +1,4 @@
++/** Конец потока: у ICMP портов нет, поэтому только адрес. */
++export function fmtEndpoint(proto, ip, port) {
++  return proto === 'ICMP' ? ip : ip + ':' + port;
++}
+diff --git a/public/js/utils/fmtNum.js b/public/js/utils/fmtNum.js
+new file mode 100644
+index 0000000..effbf67
+--- /dev/null
++++ b/public/js/utils/fmtNum.js
+@@ -0,0 +1,4 @@
++/** 21156 → "21 156" */
++export function fmtNum(n) {
++  return Number(n).toLocaleString('ru-RU');
++}
+diff --git a/public/js/utils/fmtRate.js b/public/js/utils/fmtRate.js
+new file mode 100644
+index 0000000..ed25b21
+--- /dev/null
++++ b/public/js/utils/fmtRate.js
+@@ -0,0 +1,7 @@
++/** Скорость для таблицы: null (мало данных) → "—", большие числа — с приставкой k/M. */
++export function fmtRate(v) {
++  if (v === null || v === undefined) return '—';
++  if (v >= 1e6) return (v / 1e6).toFixed(1) + ' M';
++  if (v >= 1e3) return (v / 1e3).toFixed(1) + ' k';
++  return v.toFixed(1);
++}
+diff --git a/public/js/utils/niceTicks.js b/public/js/utils/niceTicks.js
+new file mode 100644
+index 0000000..91646b3
+--- /dev/null
++++ b/public/js/utils/niceTicks.js
+@@ -0,0 +1,12 @@
++/** «Круглые» отметки оси от 0 до значения не меньше max. */
++export function niceTicks(max, count = 5) {
++  if (!(max > 0)) return [0, 1];
++  const raw = max / count;
++  const pow = 10 ** Math.floor(Math.log10(raw));
++  const f = raw / pow;
++  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * pow;
++  const ticks = [];
++  let i = 0;
++  do { ticks.push(+(i * step).toFixed(10)); i++; } while (ticks[ticks.length - 1] < max);
++  return ticks;
++}
+diff --git a/src/config.js b/src/config.js
+index d86c4b0..75e1032 100644
+--- a/src/config.js
++++ b/src/config.js
+@@ -8,7 +8,26 @@ module.exports = {
+   // Папку с логами можно переопределить: LOGS_DIR=D:\my_logs npm start
+   LOGS_DIR: process.env.LOGS_DIR ? path.resolve(process.env.LOGS_DIR) : path.join(ROOT_DIR, 'logs'),
+   PUBLIC_DIR: path.join(ROOT_DIR, 'public'),
++  // ЛР №2: папка с захваченным трафиком (.pcap)
++  PCAPS_DIR: process.env.PCAPS_DIR ? path.resolve(process.env.PCAPS_DIR) : path.join(ROOT_DIR, 'pcaps'),
++  PCAP_EXTENSIONS: ['.pcap'],
++  PCAP_MAX_BYTES: 200 * 1024 * 1024,
+   // В формате syslog нет года, поэтому он задан здесь
+   LOG_YEAR: 2026,
+-  LOG_EXTENSIONS: ['.txt', '.log']
++  LOG_EXTENSIONS: ['.txt', '.log'],
++
++  // Пороги анализа трафика (ЛР №2)
++  TRAFFIC: {
++    MIN_DURATION_SEC: 0.001,   // короче — PPS/BPS не считаем (деление на ~0 даёт мусор)
++    SCAN_MIN_PORTS: 10,        // сканирование: столько разных портов одного узла от одного источника
++    SCAN_MAX_PKTS_PER_PORT: 2, // ...при этом на порт приходится не больше N пакетов (SYN + RST)
++    FLOOD_MIN_SOURCES: 10,     // SYN-флуд: SYN без ACK на один порт от стольких источников...
++    FLOOD_MIN_PACKETS: 100,    // ...или столько SYN без ACK даже от одного источника
++    ICMP_BIG_SIZE: 1000,       // ICMP-пакет крупнее (байт) считается аномальным
++    ICMP_FLOOD_PACKETS: 20,    // ICMP-флуд: минимум пакетов в потоке...
++    ICMP_FLOOD_PPS: 100,       // ...и частота (пакетов/с)
++    ICMP_NORMAL_TYPES: [0, 3, 8, 11], // echo reply, unreachable, echo request, time exceeded
++    MAX_POINTS: 20000,         // максимум точек для графиков в ответе API
++    MAX_FLOWS: 2000            // максимум потоков в ответе API
++  }
+ };
+diff --git a/src/core/pcap/aggregateFlows.js b/src/core/pcap/aggregateFlows.js
+new file mode 100644
+index 0000000..956ee6d
+--- /dev/null
++++ b/src/core/pcap/aggregateFlows.js
+@@ -0,0 +1,64 @@
++const { normalizeFlowKey } = require('./normalizeFlowKey');
++
++/**
++ * Накапливает статистику по потокам (вместо вывода каждого пакета).
++ * Ключ — пятёрка (IP_src, IP_dst, Port_src, Port_dst, Protocol), нормализованная так,
++ * что A→B и B→A попадают в один поток. «Инициатор» — отправитель первого увиденного пакета.
++ * @param {Iterable} packets  результат parsePacket
++ * @returns {Map<string, object>}
++ */
++function aggregateFlows(packets) {
++  const flows = new Map();
++
++  for (const pkt of packets) {
++    const key = normalizeFlowKey(pkt);
++    let f = flows.get(key);
++    if (!f) {
++      f = {
++        key,
++        proto: pkt.proto,
++        initiator: { ip: pkt.src, port: pkt.sport },
++        responder: { ip: pkt.dst, port: pkt.dport },
++        packets: 0,
++        bytes: 0,
++        start_time: pkt.ts,
++        end_time: pkt.ts,
++        max_size: 0,
++        fwd: { packets: 0, bytes: 0 }, // инициатор → ответчик
++        rev: { packets: 0, bytes: 0 }, // ответчик → инициатор
++        syn_count: 0,
++        ack_count: 0,
++        rst_count: 0,
++        fin_count: 0,
++        psh_count: 0,
++        icmp_types: {}
++      };
++      flows.set(key, f);
++    }
++
++    const forward = pkt.src === f.initiator.ip && pkt.sport === f.initiator.port;
++    const dir = forward ? f.fwd : f.rev;
++    dir.packets++;
++    dir.bytes += pkt.len;
++
++    f.packets++;
++    f.bytes += pkt.len;
++    if (pkt.ts < f.start_time) f.start_time = pkt.ts;
++    if (pkt.ts > f.end_time) f.end_time = pkt.ts;
++    if (pkt.len > f.max_size) f.max_size = pkt.len;
++
++    if (pkt.flags.syn) f.syn_count++;
++    if (pkt.flags.ack) f.ack_count++;
++    if (pkt.flags.rst) f.rst_count++;
++    if (pkt.flags.fin) f.fin_count++;
++    if (pkt.flags.psh) f.psh_count++;
++
++    if (pkt.icmpType !== null) {
++      f.icmp_types[pkt.icmpType] = (f.icmp_types[pkt.icmpType] || 0) + 1;
++    }
++  }
++
++  return flows;
++}
++
++module.exports = { aggregateFlows };
+diff --git a/src/core/pcap/analyzePcap.js b/src/core/pcap/analyzePcap.js
+new file mode 100644
+index 0000000..cdb1cd2
+--- /dev/null
++++ b/src/core/pcap/analyzePcap.js
+@@ -0,0 +1,106 @@
++const { parsePcap } = require('./parsePcap');
++const { parsePacket } = require('./parsePacket');
++const { aggregateFlows } = require('./aggregateFlows');
++const { computeFlowMetrics } = require('./computeFlowMetrics');
++const { classifyFlows } = require('./classifyFlows');
++
++const CATEGORIES = ['legit', 'scan', 'synflood', 'icmp'];
++
++/** Равномерно прореживает массив до max элементов (для ответа API). */
++function sample(arr, max) {
++  if (arr.length <= max) return arr;
++  const step = Math.ceil(arr.length / max);
++  return arr.filter((_, i) => i % step === 0);
++}
++
++function serializeFlow(f) {
++  const m = f.metrics;
++  return {
++    key: f.key,
++    proto: f.proto,
++    src: f.initiator.ip, sport: f.initiator.port,
++    dst: f.responder.ip, dport: f.responder.port,
++    packets: f.packets, bytes: f.bytes,
++    start_time: f.start_time, end_time: f.end_time,
++    fwd: f.fwd, rev: f.rev,
++    syn_count: f.syn_count, ack_count: f.ack_count, rst_count: f.rst_count,
++    fin_count: f.fin_count, psh_count: f.psh_count,
++    max_size: f.max_size,
++    duration: m.duration, pps: m.pps, bps: m.bps,
++    syn_ratio: m.syn_ratio, avg_size: m.avg_size,
++    category: f.category, reasons: f.reasons
++  };
++}
++
++/**
++ * Полный анализ одного .pcap: разбор → потоки → метрики → классификация → данные для графиков.
++ * Знает только про Buffer, не про HTTP и файловую систему.
++ */
++function analyzePcap(buffer, fileName, cfg) {
++  const { linkType, packets: rawPackets, truncated } = parsePcap(buffer);
++
++  const packets = [];
++  for (const raw of rawPackets) {
++    const p = parsePacket(raw, linkType);
++    if (p) packets.push(p);
++  }
++
++  const flowList = [...aggregateFlows(packets).values()];
++  flowList.forEach(f => { f.metrics = computeFlowMetrics(f, cfg.MIN_DURATION_SEC); });
++  const incidents = classifyFlows(flowList, cfg);
++
++  // сводка по категориям (до обрезки списка потоков)
++  const categories = {};
++  CATEGORIES.forEach(c => { categories[c] = { flows: 0, packets: 0, bytes: 0 }; });
++  flowList.forEach(f => {
++    const c = categories[f.category];
++    c.flows++; c.packets += f.packets; c.bytes += f.bytes;
++  });
++
++  // счётчики для диаграмм
++  const protocols = { TCP: 0, UDP: 0, ICMP: 0 };
++  const flags = { SYN: 0, ACK: 0, PSH: 0, RST: 0, FIN: 0 };
++  flowList.forEach(f => {
++    protocols[f.proto] += f.packets;
++    flags.SYN += f.syn_count; flags.ACK += f.ack_count; flags.PSH += f.psh_count;
++    flags.RST += f.rst_count; flags.FIN += f.fin_count;
++  });
++
++  const t0 = packets.length ? Math.min(...packets.map(p => p.ts)) : 0;
++  const t1 = packets.length ? Math.max(...packets.map(p => p.ts)) : 0;
++  const totalBytes = packets.reduce((acc, p) => acc + p.len, 0);
++
++  const sizes = sample(packets.map(p => p.len), cfg.MAX_POINTS);
++  const timeline = sample(packets, cfg.MAX_POINTS).map(p => ({ t: p.ts - t0, size: p.len, proto: p.proto }));
++
++  const flows = flowList
++    .slice()
++    .sort((a, b) => b.packets - a.packets || b.bytes - a.bytes)
++    .slice(0, cfg.MAX_FLOWS)
++    .map(serializeFlow);
++
++  return {
++    fileName,
++    status: 'OK',
++    linkType,
++    truncated,
++    totalRecords: rawPackets.length,
++    totalPackets: packets.length,
++    ignoredPackets: rawPackets.length - packets.length,
++    totalBytes,
++    totalFlows: flowList.length,
++    flowsTruncated: flowList.length > flows.length,
++    t0,
++    duration: t1 - t0,
++    protocols,
++    flags,
++    categories,
++    incidents,
++    sizes,
++    timeline,
++    sampled: packets.length > cfg.MAX_POINTS,
++    flows
++  };
++}
++
++module.exports = { analyzePcap };
+diff --git a/src/core/pcap/classifyFlows.js b/src/core/pcap/classifyFlows.js
+new file mode 100644
+index 0000000..55a603f
+--- /dev/null
++++ b/src/core/pcap/classifyFlows.js
+@@ -0,0 +1,129 @@
++const ICMP_TYPE_NAMES = {
++  0: 'Echo Reply', 3: 'Destination Unreachable', 4: 'Source Quench', 5: 'Redirect',
++  8: 'Echo Request', 9: 'Router Advertisement', 11: 'Time Exceeded', 13: 'Timestamp', 17: 'Address Mask'
++};
++
++const isBroadcast = ip => ip === '255.255.255.255' || ip.endsWith('.255');
++
++function groupBy(items, keyFn) {
++  const map = new Map();
++  for (const it of items) {
++    const k = keyFn(it);
++    if (!map.has(k)) map.set(k, []);
++    map.get(k).push(it);
++  }
++  return map;
++}
++
++function sum(items, field) {
++  return items.reduce((acc, it) => acc + it[field], 0);
++}
++
++function span(items) {
++  return {
++    start_time: Math.min(...items.map(f => f.start_time)),
++    end_time: Math.max(...items.map(f => f.end_time))
++  };
++}
++
++/**
++ * Эвристическая классификация потоков. Каждому потоку ставит category и reasons:
++ *   legit | scan | synflood | icmp
++ * и возвращает список инцидентов (по одному на найденную атаку/аномалию).
++ * Пороги — в config.TRAFFIC.
++ */
++function classifyFlows(flows, cfg) {
++  const incidents = [];
++  flows.forEach(f => { f.category = 'legit'; f.reasons = []; });
++
++  // 1. Сканирование портов: один источник → один узел, много РАЗНЫХ портов, на каждый 1–2 пакета без ACK
++  const probes = flows.filter(f =>
++    f.proto === 'TCP' && f.syn_count > 0 && f.ack_count === 0 && f.packets <= cfg.SCAN_MAX_PKTS_PER_PORT);
++  for (const group of groupBy(probes, f => f.initiator.ip + '>' + f.responder.ip).values()) {
++    const ports = [...new Set(group.map(f => f.responder.port))].sort((a, b) => a - b);
++    if (ports.length < cfg.SCAN_MIN_PORTS) continue;
++    const first = group[0];
++    const sequential = ports[ports.length - 1] - ports[0] + 1 === ports.length;
++    group.forEach(f => {
++      f.category = 'scan';
++      f.reasons = ['Один SYN на порт, всего ' + ports.length + ' портов узла ' + first.responder.ip];
++    });
++    incidents.push({
++      type: 'scan',
++      title: 'Сканирование портов',
++      src: first.initiator.ip,
++      dst: first.responder.ip,
++      description: `${first.initiator.ip} отправил SYN на ${ports.length} разных портов узла ${first.responder.ip} ` +
++        `(${ports[0]}–${ports[ports.length - 1]}${sequential ? ', подряд' : ''}), по ${Math.max(...group.map(f => f.packets))} пакету на порт, без завершения соединений.`,
++      flows: group.length,
++      packets: sum(group, 'packets'),
++      ...span(group)
++    });
++  }
++
++  // 2. SYN-флуд: много SYN без ACK на один порт (от многих источников или просто очень много)
++  const halfOpen = flows.filter(f =>
++    f.category === 'legit' && f.proto === 'TCP' && f.syn_count > 0 && f.ack_count === 0);
++  for (const group of groupBy(halfOpen, f => f.responder.ip + ':' + f.responder.port).values()) {
++    const sources = [...new Set(group.map(f => f.initiator.ip))];
++    const synPackets = sum(group, 'syn_count');
++    if (sources.length < cfg.FLOOD_MIN_SOURCES && synPackets < cfg.FLOOD_MIN_PACKETS) continue;
++    const first = group[0];
++    const t = span(group);
++    group.forEach(f => {
++      f.category = 'synflood';
++      f.reasons = ['SYN без ACK на ' + first.responder.ip + ':' + first.responder.port + ', источников: ' + sources.length];
++    });
++    incidents.push({
++      type: 'synflood',
++      title: 'SYN-флуд (DoS)',
++      src: sources.length > 1 ? sources.length + ' источников' : sources[0],
++      dst: first.responder.ip + ':' + first.responder.port,
++      sources: sources.slice(0, 5),
++      sources_count: sources.length,
++      description: `${synPackets} SYN-пакетов без единого ACK на ${first.responder.ip}:${first.responder.port} ` +
++        `от ${sources.length} источник(ов); соединения не завершаются.`,
++      flows: group.length,
++      packets: sum(group, 'packets'),
++      ...t
++    });
++  }
++
++  // 3. Аномалии ICMP
++  for (const f of flows.filter(x => x.proto === 'ICMP')) {
++    const reasons = [];
++    const types = Object.keys(f.icmp_types).map(Number);
++    if ((isBroadcast(f.initiator.ip) || isBroadcast(f.responder.ip)) && f.icmp_types[8]) {
++      reasons.push('echo-запросы на broadcast-адрес (возможен smurf-приём)');
++    }
++    if (f.max_size > cfg.ICMP_BIG_SIZE) {
++      reasons.push('необычно крупные пакеты: до ' + f.max_size + ' байт');
++    }
++    const odd = types.filter(t => !cfg.ICMP_NORMAL_TYPES.includes(t));
++    if (odd.length) {
++      reasons.push('нестандартные типы: ' + odd.map(t => t + ' (' + (ICMP_TYPE_NAMES[t] || '?') + ')').join(', '));
++    }
++    const duration = f.end_time - f.start_time;
++    if (f.packets >= cfg.ICMP_FLOOD_PACKETS && duration >= cfg.MIN_DURATION_SEC && f.packets / duration >= cfg.ICMP_FLOOD_PPS) {
++      reasons.push('высокая частота: ' + Math.round(f.packets / duration) + ' пакетов/с');
++    }
++    if (!reasons.length) continue;
++    f.category = 'icmp';
++    f.reasons = reasons;
++    incidents.push({
++      type: 'icmp',
++      title: 'Аномалия ICMP',
++      src: f.initiator.ip,
++      dst: f.responder.ip,
++      description: f.initiator.ip + ' → ' + f.responder.ip + ': ' + reasons.join('; ') + '. Пакетов: ' + f.packets + '.',
++      flows: 1,
++      packets: f.packets,
++      start_time: f.start_time,
++      end_time: f.end_time
++    });
++  }
++
++  return incidents;
++}
++
++module.exports = { classifyFlows };
+diff --git a/src/core/pcap/computeFlowMetrics.js b/src/core/pcap/computeFlowMetrics.js
+new file mode 100644
+index 0000000..abfe507
+--- /dev/null
++++ b/src/core/pcap/computeFlowMetrics.js
+@@ -0,0 +1,17 @@
++/**
++ * Производные показатели потока. Если поток слишком короткий (один пакет или длительность
++ * меньше порога), PPS/BPS = null: деление на ~0 даёт миллионы «пакетов в секунду» из ничего.
++ */
++function computeFlowMetrics(flow, minDurationSec) {
++  const duration = flow.end_time - flow.start_time;
++  const reliable = flow.packets > 1 && duration >= minDurationSec;
++  return {
++    duration,
++    pps: reliable ? flow.packets / duration : null,
++    bps: reliable ? (flow.bytes * 8) / duration : null,
++    syn_ratio: flow.packets ? flow.syn_count / flow.packets : 0,
++    avg_size: flow.packets ? flow.bytes / flow.packets : 0
++  };
++}
++
++module.exports = { computeFlowMetrics };
+diff --git a/src/core/pcap/normalizeFlowKey.js b/src/core/pcap/normalizeFlowKey.js
+new file mode 100644
+index 0000000..6006b08
+--- /dev/null
++++ b/src/core/pcap/normalizeFlowKey.js
+@@ -0,0 +1,20 @@
++/** "192.168.1.10" → число, чтобы упорядочивать адреса. */
++function ipToNumber(ip) {
++  return ip.split('.').reduce((acc, part) => acc * 256 + Number(part), 0);
++}
++
++/**
++ * Ключ потока для СИММЕТРИЧНОГО анализа: пакеты A→B и B→A дают один и тот же ключ.
++ * Концы (ip, порт) упорядочиваются, протокол входит в ключ.
++ * @returns {string} например "TCP|10.0.0.1:443|192.168.1.5:50000"
++ */
++function normalizeFlowKey(pkt) {
++  const a = { ip: pkt.src, port: pkt.sport };
++  const b = { ip: pkt.dst, port: pkt.dport };
++  const aFirst = ipToNumber(a.ip) < ipToNumber(b.ip) ||
++    (a.ip === b.ip && a.port <= b.port);
++  const [lo, hi] = aFirst ? [a, b] : [b, a];
++  return `${pkt.proto}|${lo.ip}:${lo.port}|${hi.ip}:${hi.port}`;
++}
++
++module.exports = { normalizeFlowKey, ipToNumber };
+diff --git a/src/core/pcap/parsePacket.js b/src/core/pcap/parsePacket.js
+new file mode 100644
+index 0000000..cbf36f2
+--- /dev/null
++++ b/src/core/pcap/parsePacket.js
+@@ -0,0 +1,87 @@
++const IP_PROTO = { 1: 'ICMP', 6: 'TCP', 17: 'UDP' };
++
++/** Находит начало IPv4-заголовка в кадре, учитывая тип канального уровня. -1 — это не IPv4. */
++function findIpOffset(data, linkType) {
++  switch (linkType) {
++    case 1: { // Ethernet (+ один тег VLAN)
++      if (data.length < 14) return -1;
++      let type = data.readUInt16BE(12);
++      let off = 14;
++      if (type === 0x8100 && data.length >= 18) { type = data.readUInt16BE(16); off = 18; }
++      return type === 0x0800 ? off : -1;
++    }
++    case 0: // BSD loopback (Npcap Loopback): 4 байта семейства адресов
++      if (data.length < 4) return -1;
++      return data[0] === 2 || data[3] === 2 ? 4 : -1;
++    case 101: // Raw IP (v4 или v6 — различаем по версии)
++    case 228: // Raw IPv4
++      return data.length >= 1 && data[0] >> 4 === 4 ? 0 : -1;
++    case 113: // Linux cooked capture
++      if (data.length < 16) return -1;
++      return data.readUInt16BE(14) === 0x0800 ? 16 : -1;
++    default:
++      return -1;
++  }
++}
++
++/**
++ * Разбирает кадр. Возвращает null, если в нём нет IPv4 + TCP/UDP/ICMP (такие пакеты игнорируются).
++ * @returns {null | {ts, len, src, dst, proto, sport, dport, flags, icmpType, icmpCode}}
++ */
++function parsePacket(raw, linkType) {
++  const data = raw.data;
++  const ipOff = findIpOffset(data, linkType);
++  if (ipOff < 0 || data.length < ipOff + 20) return null;
++
++  const ihl = (data[ipOff] & 0x0f) * 4;
++  if (ihl < 20 || data.length < ipOff + ihl) return null;
++
++  const fragOffset = data.readUInt16BE(ipOff + 6) & 0x1fff;
++  if (fragOffset !== 0) return null; // не первый фрагмент: заголовка L4 в нём нет
++
++  const proto = IP_PROTO[data[ipOff + 9]];
++  if (!proto) return null;
++
++  const l4 = ipOff + ihl;
++  const pkt = {
++    ts: raw.ts,
++    len: raw.origLen,
++    src: ipToString(data, ipOff + 12),
++    dst: ipToString(data, ipOff + 16),
++    proto,
++    sport: 0,
++    dport: 0,
++    flags: { syn: false, ack: false, rst: false, fin: false, psh: false },
++    icmpType: null,
++    icmpCode: null
++  };
++
++  if (proto === 'ICMP') {
++    if (data.length < l4 + 2) return null;
++    pkt.icmpType = data[l4];
++    pkt.icmpCode = data[l4 + 1];
++    return pkt;
++  }
++
++  if (data.length < l4 + 4) return null;
++  pkt.sport = data.readUInt16BE(l4);
++  pkt.dport = data.readUInt16BE(l4 + 2);
++
++  if (proto === 'TCP' && data.length >= l4 + 14) {
++    const f = data[l4 + 13];
++    pkt.flags = {
++      fin: !!(f & 0x01),
++      syn: !!(f & 0x02),
++      rst: !!(f & 0x04),
++      psh: !!(f & 0x08),
++      ack: !!(f & 0x10)
++    };
++  }
++  return pkt;
++}
++
++function ipToString(buf, off) {
++  return buf[off] + '.' + buf[off + 1] + '.' + buf[off + 2] + '.' + buf[off + 3];
++}
++
++module.exports = { parsePacket };
+diff --git a/src/core/pcap/parsePcap.js b/src/core/pcap/parsePcap.js
+new file mode 100644
+index 0000000..253b58a
+--- /dev/null
++++ b/src/core/pcap/parsePcap.js
+@@ -0,0 +1,52 @@
++/**
++ * Разбирает содержимое .pcap (классический формат libpcap) в список «сырых» пакетов.
++ * @returns {{linkType:number, packets:{ts:number, origLen:number, data:Buffer}[], truncated:boolean}}
++ * @throws Error с полем code: ERR_NOT_PCAP | ERR_PCAPNG
++ */
++function parsePcap(buffer) {
++  if (buffer.length < 24) throw makeError('ERR_NOT_PCAP', 'Файл слишком короткий для .pcap');
++
++  const magicLE = buffer.readUInt32LE(0);
++  if (magicLE === 0x0a0d0d0a) {
++    throw makeError('ERR_PCAPNG', 'Формат pcapng не поддерживается: сохраните как .pcap (Wireshark: «Сохранить как» → pcap)');
++  }
++
++  let le, nano;
++  if (magicLE === 0xa1b2c3d4) { le = true; nano = false; }
++  else if (magicLE === 0xa1b23c4d) { le = true; nano = true; }
++  else if (magicLE === 0xd4c3b2a1) { le = false; nano = false; }
++  else if (magicLE === 0x4d3cb2a1) { le = false; nano = true; }
++  else throw makeError('ERR_NOT_PCAP', 'Неизвестная сигнатура: это не .pcap');
++
++  const u32 = off => (le ? buffer.readUInt32LE(off) : buffer.readUInt32BE(off));
++  const linkType = u32(20) & 0x0fffffff; // старшие биты — флаги FCS, нам не нужны
++
++  const packets = [];
++  let off = 24;
++  let truncated = false;
++  while (off + 16 <= buffer.length) {
++    const sec = u32(off);
++    const frac = u32(off + 4);
++    const capLen = u32(off + 8);
++    const origLen = u32(off + 12);
++    off += 16;
++    if (off + capLen > buffer.length) { truncated = true; break; }
++    packets.push({
++      ts: sec + frac / (nano ? 1e9 : 1e6),
++      origLen,
++      data: buffer.subarray(off, off + capLen)
++    });
++    off += capLen;
++  }
++  if (off < buffer.length && !truncated) truncated = true; // хвост короче заголовка записи
++
++  return { linkType, packets, truncated };
++}
++
++function makeError(code, message) {
++  const e = new Error(message);
++  e.code = code;
++  return e;
++}
++
++module.exports = { parsePcap };
+diff --git a/src/core/pcap/scanPcapDirectory.js b/src/core/pcap/scanPcapDirectory.js
+new file mode 100644
+index 0000000..72bb12a
+--- /dev/null
++++ b/src/core/pcap/scanPcapDirectory.js
+@@ -0,0 +1,38 @@
++const fs = require('fs');
++const path = require('path');
++const { PCAPS_DIR, PCAP_EXTENSIONS, PCAP_MAX_BYTES, TRAFFIC } = require('../../config');
++const { analyzePcap } = require('./analyzePcap');
++
++/**
++ * Сканирует папку pcaps/ и анализирует каждый .pcap. Битый файл не останавливает работу:
++ * он попадает в список со статусом CORRUPTED.
++ */
++function scanPcapDirectory() {
++  if (!fs.existsSync(PCAPS_DIR)) {
++    return { status: 'DIR_NOT_FOUND', error: 'Папка "pcaps" не найдена рядом со скриптом.', files: [] };
++  }
++
++  const names = fs.readdirSync(PCAPS_DIR)
++    .filter(f => PCAP_EXTENSIONS.includes(path.extname(f).toLowerCase()))
++    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
++
++  if (names.length === 0) {
++    return { status: 'DIR_EMPTY', error: 'В папке "pcaps" нет файлов .pcap. Положите захваченный трафик или запустите npm run capture.', files: [] };
++  }
++
++  const files = names.map(fileName => {
++    try {
++      const filePath = path.join(PCAPS_DIR, fileName);
++      const size = fs.statSync(filePath).size;
++      if (size === 0) throw new Error('Файл пуст (0 байт)');
++      if (size > PCAP_MAX_BYTES) throw new Error('Файл слишком большой (больше ' + PCAP_MAX_BYTES / 1048576 + ' МБ)');
++      return analyzePcap(fs.readFileSync(filePath), fileName, TRAFFIC);
++    } catch (err) {
++      return { fileName, status: 'CORRUPTED', error: err.message };
++    }
++  });
++
++  return { status: 'SUCCESS', files };
++}
++
++module.exports = { scanPcapDirectory };
+diff --git a/src/server/createServer.js b/src/server/createServer.js
+index 7cb0672..7f71443 100644
+--- a/src/server/createServer.js
++++ b/src/server/createServer.js
+@@ -1,5 +1,6 @@
+ const http = require('http');
+ const { handleScanRoute } = require('./routes/scanRoute');
++const { handleTrafficRoute } = require('./routes/trafficRoute');
+ const { handleStaticRoute } = require('./routes/staticRoute');
+ const { sendText } = require('./utils/sendText');
+ 
+@@ -14,6 +15,7 @@ function createServer() {
+     const url = new URL(req.url, 'http://localhost');
+ 
+     if (url.pathname === '/api/scan') return handleScanRoute(req, res);
++    if (url.pathname === '/api/traffic') return handleTrafficRoute(req, res);
+     return handleStaticRoute(url.pathname, res);
+   });
+ }
+diff --git a/src/server/routes/trafficRoute.js b/src/server/routes/trafficRoute.js
+new file mode 100644
+index 0000000..89281e0
+--- /dev/null
++++ b/src/server/routes/trafficRoute.js
+@@ -0,0 +1,9 @@
++const { scanPcapDirectory } = require('../../core/pcap/scanPcapDirectory');
++const { sendJson } = require('../utils/sendJson');
++
++/** GET /api/traffic — результат анализа всех .pcap из папки pcaps/ */
++function handleTrafficRoute(req, res) {
++  sendJson(res, 200, scanPcapDirectory());
++}
++
++module.exports = { handleTrafficRoute };
+diff --git a/tests/helpers/buildPcap.js b/tests/helpers/buildPcap.js
+new file mode 100644
+index 0000000..7569b03
+--- /dev/null
++++ b/tests/helpers/buildPcap.js
+@@ -0,0 +1,47 @@
++/** Помощники для тестов: собирают IPv4-пакеты и .pcap в памяти. */
++const FLAG_BITS = { fin: 0x01, syn: 0x02, rst: 0x04, psh: 0x08, ack: 0x10 };
++
++function ipv4Packet({ src, dst, proto = 'TCP', sport = 0, dport = 0, flags = [], icmpType = 8, payload = 0 }) {
++  const l4 = proto === 'TCP' ? 20 : proto === 'UDP' ? 8 : 8;
++  const total = 20 + l4 + payload;
++  const b = Buffer.alloc(total);
++  b[0] = 0x45;
++  b.writeUInt16BE(total, 2);
++  b[8] = 64;
++  b[9] = { ICMP: 1, TCP: 6, UDP: 17 }[proto];
++  src.split('.').forEach((x, i) => { b[12 + i] = Number(x); });
++  dst.split('.').forEach((x, i) => { b[16 + i] = Number(x); });
++  if (proto === 'ICMP') {
++    b[20] = icmpType;
++  } else {
++    b.writeUInt16BE(sport, 20);
++    b.writeUInt16BE(dport, 22);
++    if (proto === 'TCP') {
++      b[32] = 0x50;
++      b[33] = flags.reduce((acc, f) => acc | FLAG_BITS[f], 0);
++    }
++  }
++  return b;
++}
++
++/** frames: [{ts (сек), data: Buffer}] → Buffer формата pcap (LE, микросекунды). */
++function buildPcap(frames, linkType = 101) {
++  const header = Buffer.alloc(24);
++  header.writeUInt32LE(0xa1b2c3d4, 0);
++  header.writeUInt16LE(2, 4);
++  header.writeUInt16LE(4, 6);
++  header.writeUInt32LE(65535, 16);
++  header.writeUInt32LE(linkType, 20);
++  const parts = [header];
++  for (const f of frames) {
++    const rec = Buffer.alloc(16);
++    rec.writeUInt32LE(Math.floor(f.ts), 0);
++    rec.writeUInt32LE(Math.round((f.ts % 1) * 1e6), 4);
++    rec.writeUInt32LE(f.data.length, 8);
++    rec.writeUInt32LE(f.data.length, 12);
++    parts.push(rec, f.data);
++  }
++  return Buffer.concat(parts);
++}
++
++module.exports = { ipv4Packet, buildPcap };
+diff --git a/tests/pcap.test.js b/tests/pcap.test.js
+new file mode 100644
+index 0000000..ed420f4
+--- /dev/null
++++ b/tests/pcap.test.js
+@@ -0,0 +1,119 @@
++const test = require('node:test');
++const assert = require('node:assert');
++const fs = require('fs');
++const path = require('path');
++const { parsePcap } = require('../src/core/pcap/parsePcap');
++const { parsePacket } = require('../src/core/pcap/parsePacket');
++const { aggregateFlows } = require('../src/core/pcap/aggregateFlows');
++const { computeFlowMetrics } = require('../src/core/pcap/computeFlowMetrics');
++const { analyzePcap } = require('../src/core/pcap/analyzePcap');
++const { TRAFFIC } = require('../src/config');
++const { ipv4Packet, buildPcap } = require('./helpers/buildPcap');
++
++const FIXTURE = path.join(__dirname, '..', 'pcaps', 'lab2_test_traffic.pcap');
++
++function parsed(frames) {
++  const { linkType, packets } = parsePcap(buildPcap(frames));
++  return packets.map(p => parsePacket(p, linkType)).filter(Boolean);
++}
++
++test('parsePcap: сигнатуры и ошибки', () => {
++  assert.throws(() => parsePcap(Buffer.from('0a0d0d0a' + '00'.repeat(30), 'hex')), { code: 'ERR_PCAPNG' });
++  assert.throws(() => parsePcap(Buffer.alloc(40, 1)), { code: 'ERR_NOT_PCAP' });
++  assert.throws(() => parsePcap(Buffer.alloc(5)), { code: 'ERR_NOT_PCAP' });
++});
++
++test('parsePcap: оборванная последняя запись не роняет разбор', () => {
++  const full = buildPcap([
++    { ts: 1, data: ipv4Packet({ src: '1.1.1.1', dst: '2.2.2.2', sport: 1, dport: 2 }) },
++    { ts: 2, data: ipv4Packet({ src: '1.1.1.1', dst: '2.2.2.2', sport: 1, dport: 2 }) }
++  ]);
++  const res = parsePcap(full.subarray(0, full.length - 5));
++  assert.strictEqual(res.packets.length, 1);
++  assert.strictEqual(res.truncated, true);
++});
++
++test('parsePacket: Ethernet + TCP, флаги и порты', () => {
++  const ip = ipv4Packet({ src: '10.0.0.1', dst: '10.0.0.2', sport: 1234, dport: 80, flags: ['syn', 'ack'] });
++  const eth = Buffer.concat([Buffer.alloc(12), Buffer.from([0x08, 0x00]), ip]);
++  const p = parsePacket({ ts: 1, origLen: eth.length, data: eth }, 1);
++  assert.deepStrictEqual([p.src, p.dst, p.proto, p.sport, p.dport], ['10.0.0.1', '10.0.0.2', 'TCP', 1234, 80]);
++  assert.deepStrictEqual([p.flags.syn, p.flags.ack, p.flags.rst], [true, true, false]);
++});
++
++test('parsePacket: не-IP кадры (ARP) и чужие протоколы игнорируются', () => {
++  const arp = Buffer.concat([Buffer.alloc(12), Buffer.from([0x08, 0x06]), Buffer.alloc(28)]);
++  assert.strictEqual(parsePacket({ ts: 1, origLen: arp.length, data: arp }, 1), null);
++  const ip = ipv4Packet({ src: '1.1.1.1', dst: '2.2.2.2' });
++  ip[9] = 47; // GRE
++  assert.strictEqual(parsePacket({ ts: 1, origLen: ip.length, data: ip }, 101), null);
++});
++
++test('aggregateFlows: A→B и B→A — один поток (симметричный анализ)', () => {
++  const flows = aggregateFlows(parsed([
++    { ts: 1.0, data: ipv4Packet({ src: '10.0.0.1', dst: '93.1.1.1', sport: 50000, dport: 443, flags: ['syn'] }) },
++    { ts: 1.1, data: ipv4Packet({ src: '93.1.1.1', dst: '10.0.0.1', sport: 443, dport: 50000, flags: ['syn', 'ack'] }) },
++    { ts: 1.2, data: ipv4Packet({ src: '10.0.0.1', dst: '93.1.1.1', sport: 50000, dport: 443, flags: ['ack'] }) }
++  ]));
++  assert.strictEqual(flows.size, 1);
++  const f = [...flows.values()][0];
++  assert.strictEqual(f.packets, 3);
++  assert.deepStrictEqual([f.fwd.packets, f.rev.packets], [2, 1]);
++  assert.deepStrictEqual([f.initiator.ip, f.initiator.port], ['10.0.0.1', 50000]);
++  assert.deepStrictEqual([f.syn_count, f.ack_count], [2, 2]);
++  assert.ok(Math.abs(f.end_time - f.start_time - 0.2) < 1e-6);
++});
++
++test('aggregateFlows: разные порты и протоколы — разные потоки', () => {
++  const flows = aggregateFlows(parsed([
++    { ts: 1, data: ipv4Packet({ src: '10.0.0.1', dst: '10.0.0.2', sport: 1, dport: 53, proto: 'UDP' }) },
++    { ts: 1, data: ipv4Packet({ src: '10.0.0.1', dst: '10.0.0.2', sport: 1, dport: 53, proto: 'TCP' }) },
++    { ts: 1, data: ipv4Packet({ src: '10.0.0.1', dst: '10.0.0.2', sport: 2, dport: 53, proto: 'UDP' }) }
++  ]));
++  assert.strictEqual(flows.size, 3);
++});
++
++test('computeFlowMetrics: PPS/BPS не считаются на нулевой длительности', () => {
++  const [single] = aggregateFlows(parsed([
++    { ts: 1, data: ipv4Packet({ src: '1.1.1.1', dst: '2.2.2.2', sport: 1, dport: 2, flags: ['syn'] }) }
++  ])).values();
++  const m = computeFlowMetrics(single, TRAFFIC.MIN_DURATION_SEC);
++  assert.strictEqual(m.pps, null);
++  assert.strictEqual(m.bps, null);
++  assert.strictEqual(m.syn_ratio, 1);
++
++  const [two] = aggregateFlows(parsed([
++    { ts: 1, data: ipv4Packet({ src: '1.1.1.1', dst: '2.2.2.2', sport: 1, dport: 2 }) },
++    { ts: 2, data: ipv4Packet({ src: '1.1.1.1', dst: '2.2.2.2', sport: 1, dport: 2 }) }
++  ])).values();
++  const m2 = computeFlowMetrics(two, TRAFFIC.MIN_DURATION_SEC);
++  assert.strictEqual(m2.pps, 2);
++  assert.strictEqual(m2.bps, 2 * 40 * 8 / 1);
++});
++
++test('lab2_test_traffic.pcap: разбор и классификация', () => {
++  const r = analyzePcap(fs.readFileSync(FIXTURE), 'lab2_test_traffic.pcap', TRAFFIC);
++  assert.strictEqual(r.totalPackets, 240);
++  assert.strictEqual(r.ignoredPackets, 0);
++  assert.deepStrictEqual(r.protocols, { TCP: 195, UDP: 20, ICMP: 25 });
++
++  const cat = r.categories;
++  assert.strictEqual(cat.legit.packets, 110);
++  assert.strictEqual(cat.scan.packets, 15);
++  assert.strictEqual(cat.synflood.packets, 100);
++  assert.strictEqual(cat.icmp.packets, 15);
++
++  const byType = Object.fromEntries(r.incidents.map(i => [i.type, i]));
++  assert.strictEqual(r.incidents.length, 3);
++  assert.strictEqual(byType.scan.src, '203.0.113.100');
++  assert.strictEqual(byType.scan.dst, '192.168.1.50');
++  assert.strictEqual(byType.synflood.dst, '192.168.1.100:80');
++  assert.strictEqual(byType.synflood.sources_count, 20);
++  assert.strictEqual(byType.icmp.dst, '192.168.1.255');
++});
++
++test('lab2_test_traffic.pcap: обычный ping на 8.8.8.8 не считается аномалией', () => {
++  const r = analyzePcap(fs.readFileSync(FIXTURE), 'x.pcap', TRAFFIC);
++  const ping = r.flows.find(f => f.proto === 'ICMP' && f.dst === '8.8.8.8');
++  assert.strictEqual(ping.category, 'legit');
++});
+diff --git a/tools/capture.js b/tools/capture.js
+new file mode 100644
+index 0000000..62c176e
+--- /dev/null
++++ b/tools/capture.js
+@@ -0,0 +1,89 @@
++#!/usr/bin/env node
++/**
++ * Живой захват трафика для ЛР №2: запускает dumpcap (идёт с Wireshark/Npcap) или tcpdump
++ * и сохраняет .pcap в папку pcaps/, откуда его подхватит анализатор.
++ *
++ *   npm run capture -- --list
++ *   npm run capture -- --iface "Ethernet 5" --count 500
++ *   npm run capture -- --iface 4 --time 30 --out pcaps/ping.pcap
++ */
++const { spawn, spawnSync } = require('child_process');
++const fs = require('fs');
++const path = require('path');
++const { PCAPS_DIR } = require('../src/config');
++
++function parseArgs(argv) {
++  const opts = { count: 500 };
++  for (let i = 0; i < argv.length; i++) {
++    const a = argv[i];
++    const val = () => argv[++i];
++    if (a === '--iface' || a === '-i') opts.iface = val();
++    else if (a === '--count' || a === '-c') opts.count = Number(val());
++    else if (a === '--time' || a === '-t') opts.time = Number(val());
++    else if (a === '--out' || a === '-o') opts.out = val();
++    else if (a === '--dumpcap') opts.dumpcap = val();
++    else if (a === '--list' || a === '-D') opts.list = true;
++    else if (a === '--help' || a === '-h') opts.help = true;
++    else { console.error('Неизвестный аргумент: ' + a); process.exit(2); }
++  }
++  return opts;
++}
++
++function works(cmd, args) {
++  try { return spawnSync(cmd, args, { stdio: 'ignore' }).status === 0; } catch (e) { return false; }
++}
++
++function findCapturer(custom) {
++  const candidates = [custom, process.env.DUMPCAP, 'dumpcap',
++    'C:\\Program Files\\Wireshark\\dumpcap.exe', 'C:\\Program Files (x86)\\Wireshark\\dumpcap.exe'].filter(Boolean);
++  for (const c of candidates) if (works(c, ['-v'])) return { tool: 'dumpcap', cmd: c };
++  if (process.platform !== 'win32' && works('tcpdump', ['--version'])) return { tool: 'tcpdump', cmd: 'tcpdump' };
++  return null;
++}
++
++const opts = parseArgs(process.argv.slice(2));
++
++if (opts.help) {
++  console.log('Использование: npm run capture -- [--list] --iface <имя|номер> [--count 500] [--time секунды] [--out файл.pcap]');
++  process.exit(0);
++}
++
++const cap = findCapturer(opts.dumpcap);
++if (!cap) {
++  console.error('Не найден dumpcap. Установите Wireshark (вместе с Npcap) или укажите путь: --dumpcap "C:\\...\\dumpcap.exe"');
++  process.exit(1);
++}
++
++if (opts.list) {
++  process.exit(spawnSync(cap.cmd, ['-D'], { stdio: 'inherit' }).status || 0);
++}
++
++if (!opts.iface) {
++  console.error('Не указан интерфейс. Список: npm run capture -- --list');
++  process.exit(2);
++}
++if (!Number.isInteger(opts.count) || opts.count <= 0) {
++  console.error('--count должен быть положительным целым числом');
++  process.exit(2);
++}
++
++const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
++const out = path.resolve(opts.out || path.join(PCAPS_DIR, 'capture_' + stamp + '.pcap'));
++fs.mkdirSync(path.dirname(out), { recursive: true });
++
++const args = cap.tool === 'dumpcap'
++  ? ['-i', opts.iface, '-c', String(opts.count), '-F', 'pcap', '-w', out]
++  : ['-i', opts.iface, '-c', String(opts.count), '-w', out];
++if (opts.time && cap.tool === 'dumpcap') args.push('-a', 'duration:' + opts.time);
++if (opts.time && cap.tool !== 'dumpcap') console.warn('[!] --time поддерживается только dumpcap; захват остановится по --count или Ctrl+C.');
++
++console.log('[*] Захват: ' + cap.tool + ' → ' + out + ' (интерфейс: ' + opts.iface + ', пакетов: до ' + opts.count + (opts.time ? ', не дольше ' + opts.time + ' с' : '') + ')');
++console.log('[*] Нужны права на захват (Npcap / администратор). Остановка — Ctrl+C.');
++
++const child = spawn(cap.cmd, args, { stdio: 'inherit' });
++child.on('error', e => { console.error('Не удалось запустить ' + cap.cmd + ': ' + e.message); process.exit(1); });
++child.on('exit', code => {
++  if (code === 0 && fs.existsSync(out)) console.log('[*] Готово: ' + out + '\n    Откройте http://localhost:3000 → вкладка «Трафик».');
++  else console.error('[!] Захват завершился с кодом ' + code);
++  process.exit(code || 0);
++});
+diff --git a/tools/udp-burst.js b/tools/udp-burst.js
+new file mode 100644
+index 0000000..acc492f
+--- /dev/null
++++ b/tools/udp-burst.js
+@@ -0,0 +1,58 @@
++#!/usr/bin/env node
++/**
++ * Генератор «высокой частоты» для ЛР №2 (п. 8): шлёт пустые UDP-пакеты в цикле.
++ * Безопасность: адресат — только localhost или частная сеть, число пакетов и частота ограничены.
++ *
++ *   npm run udp-burst -- --host 127.0.0.1 --port 9999 --count 5000 --rate 2000
++ */
++const dgram = require('dgram');
++
++const MAX_COUNT = 100000;
++const MAX_RATE = 20000;
++
++const opts = { host: '127.0.0.1', port: 9999, count: 5000, rate: 2000 };
++const argv = process.argv.slice(2);
++for (let i = 0; i < argv.length; i++) {
++  const key = argv[i].replace(/^--/, '');
++  if (!(key in opts)) { console.error('Неизвестный аргумент: ' + argv[i]); process.exit(2); }
++  opts[key] = key === 'host' ? argv[++i] : Number(argv[++i]);
++}
++if (opts.host === 'localhost') opts.host = '127.0.0.1';
++
++function isPrivateIPv4(ip) {
++  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
++  if (!m) return false;
++  const [a, b] = [Number(m[1]), Number(m[2])];
++  return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
++}
++
++if (!isPrivateIPv4(opts.host)) {
++  console.error('Отказ: отправка разрешена только на localhost и адреса частной сети (10.*, 172.16–31.*, 192.168.*, 127.*).');
++  process.exit(1);
++}
++if (!Number.isInteger(opts.port) || opts.port < 1 || opts.port > 65535) { console.error('Некорректный --port'); process.exit(2); }
++if (!Number.isInteger(opts.count) || opts.count < 1 || opts.count > MAX_COUNT) { console.error('--count: от 1 до ' + MAX_COUNT); process.exit(2); }
++if (!Number.isInteger(opts.rate) || opts.rate < 1 || opts.rate > MAX_RATE) { console.error('--rate: от 1 до ' + MAX_RATE + ' пакетов/с'); process.exit(2); }
++
++const socket = dgram.createSocket('udp4');
++socket.on('error', () => {}); // ответы ICMP «порт недоступен» нам не важны
++
++const EMPTY = Buffer.alloc(0);
++const TICK_MS = 10;
++const perTick = Math.max(1, Math.round(opts.rate * TICK_MS / 1000));
++let sent = 0;
++const startedAt = Date.now();
++
++console.log('[*] Отправка ' + opts.count + ' пустых UDP-пакетов на ' + opts.host + ':' + opts.port + ' (~' + opts.rate + ' пакетов/с)');
++
++const timer = setInterval(() => {
++  for (let i = 0; i < perTick && sent < opts.count; i++, sent++) socket.send(EMPTY, opts.port, opts.host);
++  if (sent >= opts.count) {
++    clearInterval(timer);
++    setTimeout(() => {
++      socket.close();
++      const sec = (Date.now() - startedAt) / 1000;
++      console.log('[*] Готово: ' + sent + ' пакетов за ' + sec.toFixed(2) + ' с (' + Math.round(sent / sec) + ' пакетов/с)');
++    }, 200);
++  }
++}, TICK_MS);
