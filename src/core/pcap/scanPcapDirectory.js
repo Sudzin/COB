@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { PCAPS_DIR, PCAP_EXTENSIONS, PCAP_MAX_BYTES, TRAFFIC } = require('../../config');
+const { PCAPS_DIR, PCAP_EXTENSIONS, PCAP_MAX_BYTES, TRAFFIC, SIGNATURES_DIR } = require('../../config');
 const { analyzePcap } = require('./analyzePcap');
+const { loadSignatures } = require('../signatures/loadSignatures');
 
 /**
  * Сканирует папку pcaps/ и анализирует каждый .pcap. Битый файл не останавливает работу:
@@ -20,13 +21,17 @@ function scanPcapDirectory() {
     return { status: 'DIR_EMPTY', error: 'В папке "pcaps" нет файлов .pcap. Положите захваченный трафик или запустите npm run capture.', files: [] };
   }
 
+  const signatures = SIGNATURES_DIR && fs.existsSync(SIGNATURES_DIR)
+    ? loadSignatures(SIGNATURES_DIR)
+    : [];
+
   const files = names.map(fileName => {
     try {
       const filePath = path.join(PCAPS_DIR, fileName);
       const size = fs.statSync(filePath).size;
       if (size === 0) throw new Error('Файл пуст (0 байт)');
       if (size > PCAP_MAX_BYTES) throw new Error('Файл слишком большой (больше ' + PCAP_MAX_BYTES / 1048576 + ' МБ)');
-      return analyzePcap(fs.readFileSync(filePath), fileName, TRAFFIC);
+      return analyzePcap(fs.readFileSync(filePath), fileName, TRAFFIC, signatures);
     } catch (err) {
       return { fileName, status: 'CORRUPTED', error: err.message };
     }

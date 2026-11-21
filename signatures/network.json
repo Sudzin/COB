@@ -1,0 +1,135 @@
+[
+  {
+    "id": "SIG-SCAN-001",
+    "name": "Port_Scan_Vertical",
+    "type": "scan",
+    "severity": "MEDIUM",
+    "enabled": true,
+    "scope": "group",
+    "groupBy": "src_dst",
+    "flowFilter": [
+      { "field": "proto", "op": "eq", "value": "TCP" },
+      { "field": "syn_count", "op": "gt", "value": 0 },
+      { "field": "ack_count", "op": "eq", "value": 0 },
+      { "field": "packets", "op": "lte", "value": 2 }
+    ],
+    "conditions": [
+      { "field": "unique_dports", "op": "gte", "value": 10 }
+    ],
+    "description": "Вертикальное TCP SYN-сканирование множества портов одного хоста"
+  },
+  {
+    "id": "SIG-SCAN-002",
+    "name": "Port_Scan_Horizontal",
+    "type": "scan",
+    "severity": "MEDIUM",
+    "enabled": true,
+    "scope": "group",
+    "groupBy": "src_dport",
+    "flowFilter": [
+      { "field": "proto", "op": "eq", "value": "TCP" },
+      { "field": "syn_count", "op": "gt", "value": 0 },
+      { "field": "ack_count", "op": "eq", "value": 0 },
+      { "field": "packets", "op": "lte", "value": 2 }
+    ],
+    "conditions": [
+      { "field": "unique_dsts", "op": "gte", "value": 10 }
+    ],
+    "description": "Горизонтальное сканирование одного порта на множестве хостов сети"
+  },
+  {
+    "id": "SIG-SCAN-003",
+    "name": "Stealth_FIN_Scan",
+    "type": "scan",
+    "severity": "MEDIUM",
+    "enabled": true,
+    "scope": "group",
+    "groupBy": "src_dst",
+    "flowFilter": [
+      { "field": "proto", "op": "eq", "value": "TCP" },
+      { "field": "syn_count", "op": "eq", "value": 0 },
+      { "field": "ack_count", "op": "eq", "value": 0 },
+      { "field": "fin_count", "op": "gt", "value": 0 }
+    ],
+    "conditions": [
+      { "field": "unique_dports", "op": "gte", "value": 10 }
+    ],
+    "description": "Скрытое FIN-сканирование портов без установки TCP-соединения"
+  },
+  {
+    "id": "SIG-DOS-001",
+    "name": "SYN_Flood",
+    "type": "dos",
+    "severity": "HIGH",
+    "enabled": true,
+    "scope": "group",
+    "groupBy": "dst_dport",
+    "match": "any",
+    "flowFilter": [
+      { "field": "proto", "op": "eq", "value": "TCP" },
+      { "field": "syn_count", "op": "gt", "value": 0 },
+      { "field": "ack_count", "op": "eq", "value": 0 }
+    ],
+    "conditions": [
+      { "field": "unique_srcs", "op": "gte", "value": 10 },
+      { "field": "sum_syn", "op": "gte", "value": 100 }
+    ],
+    "description": "SYN-флуд: массовая отправка SYN без ACK на один целевой порт"
+  },
+  {
+    "id": "SIG-DOS-002",
+    "name": "UDP_Flood",
+    "type": "dos",
+    "severity": "HIGH",
+    "enabled": true,
+    "scope": "flow",
+    "conditions": [
+      { "field": "proto", "op": "eq", "value": "UDP" },
+      { "field": "packets", "op": "gte", "value": 100 },
+      { "field": "metrics.pps", "op": "gte", "value": 100 },
+      { "field": "rev.packets", "op": "eq", "value": 0 }
+    ],
+    "description": "Односторонний UDP-флуд с высокой частотой пакетов без ответов цели"
+  },
+  {
+    "id": "SIG-DOS-003",
+    "name": "ICMP_Flood",
+    "type": "dos",
+    "severity": "HIGH",
+    "enabled": true,
+    "scope": "flow",
+    "conditions": [
+      { "field": "proto", "op": "eq", "value": "ICMP" },
+      { "field": "packets", "op": "gte", "value": 20 },
+      { "field": "metrics.pps", "op": "gte", "value": 100 }
+    ],
+    "description": "ICMP-флуд с аномально высокой частотой пакетов"
+  },
+  {
+    "id": "SIG-ICMP-001",
+    "name": "ICMP_Oversized",
+    "type": "anomaly",
+    "severity": "LOW",
+    "enabled": true,
+    "scope": "flow",
+    "conditions": [
+      { "field": "proto", "op": "eq", "value": "ICMP" },
+      { "field": "max_size", "op": "gt", "value": 1000 }
+    ],
+    "description": "Аномально крупные ICMP-пакеты (свыше 1000 байт)"
+  },
+  {
+    "id": "SIG-ICMP-002",
+    "name": "ICMP_Smurf",
+    "type": "dos",
+    "severity": "HIGH",
+    "enabled": true,
+    "scope": "flow",
+    "conditions": [
+      { "field": "proto", "op": "eq", "value": "ICMP" },
+      { "field": "is_broadcast", "op": "eq", "value": true },
+      { "field": "icmp_types.8", "op": "gt", "value": 0 }
+    ],
+    "description": "ICMP Echo Request на широковещательный адрес (Smurf-атака)"
+  }
+]

@@ -36,3 +36,15 @@
 .chart-svg .ax-title{font:600 11px var(--f-sans);fill:var(--muted);}
 .chart-svg .grid{stroke:rgba(26,28,24,.16);stroke-width:1;}
 .chart-svg .axis{stroke:var(--ink);stroke-width:1.5;}
+
+/* сигнатурные алерты */
+.sig-controls{display:flex;align-items:center;gap:.5rem;}
+.sig-select{font:700 .78rem var(--f-mono);background:var(--paper);color:var(--ink);border:2px solid var(--ink);padding:.18rem .45rem;cursor:pointer;}
+
+.incident.inc-sig-high{border-left-color:var(--danger);}
+.incident.inc-sig-medium{border-left-color:var(--copper);}
+.incident.inc-sig-low{border-left-color:#2b6cb0;}
+
+.pill.sev-high{color:var(--danger);}
+.pill.sev-medium{color:var(--copper-deep);}
+.pill.sev-low{color:#2b6cb0;}

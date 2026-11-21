@@ -3,6 +3,7 @@ const { parsePacket } = require('./parsePacket');
 const { aggregateFlows } = require('./aggregateFlows');
 const { computeFlowMetrics } = require('./computeFlowMetrics');
 const { classifyFlows } = require('./classifyFlows');
+const { detectSignatures } = require('../signatures/detectSignatures');
 
 const CATEGORIES = ['legit', 'scan', 'synflood', 'icmp'];
 
@@ -33,10 +34,10 @@ function serializeFlow(f) {
 }
 
 /**
- * Полный анализ одного .pcap: разбор → потоки → метрики → классификация → данные для графиков.
+ * Полный анализ одного .pcap: разбор → потоки → метрики → классификация → сигнатуры → данные для графиков.
  * Знает только про Buffer, не про HTTP и файловую систему.
  */
-function analyzePcap(buffer, fileName, cfg) {
+function analyzePcap(buffer, fileName, cfg, signatures = []) {
   const { linkType, packets: rawPackets, truncated } = parsePcap(buffer);
 
   const packets = [];
@@ -48,6 +49,7 @@ function analyzePcap(buffer, fileName, cfg) {
   const flowList = [...aggregateFlows(packets).values()];
   flowList.forEach(f => { f.metrics = computeFlowMetrics(f, cfg.MIN_DURATION_SEC); });
   const incidents = classifyFlows(flowList, cfg);
+  const alerts = signatures.length ? detectSignatures(flowList, signatures) : [];
 
   // сводка по категориям (до обрезки списка потоков)
   const categories = {};
@@ -96,6 +98,7 @@ function analyzePcap(buffer, fileName, cfg) {
     flags,
     categories,
     incidents,
+    alerts,
     sizes,
     timeline,
     sampled: packets.length > cfg.MAX_POINTS,

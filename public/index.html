@@ -164,6 +164,7 @@
             <div class="metric-card"><div class="lab">Потоков</div><div class="val" id="tFlows">0</div></div>
             <div class="metric-card"><div class="lab">Длительность</div><div class="val" id="tDuration">0</div></div>
             <div class="metric-card"><div class="lab">Инцидентов</div><div class="val warn" id="tIncidents">0</div></div>
+            <div class="metric-card"><div class="lab">Алертов IDS</div><div class="val warn" id="tAlerts">0</div></div>
           </div>
           <p class="tbl-note" id="trafficNote"></p>
 
@@ -189,6 +190,19 @@
             <span class="tag">// ЭВРИСТИКИ</span>
           </div>
           <div id="trafficIncidents"></div>
+
+          <div class="panel-head" style="margin-top:2rem;">
+            <span>СИГНАТУРНЫЕ АЛЕРТЫ</span>
+            <div class="sig-controls">
+              <label for="severityFilter" class="tag">// ПОРОГ:</label>
+              <select id="severityFilter" class="sig-select">
+                <option value="LOW">LOW и выше</option>
+                <option value="MEDIUM">MEDIUM и выше</option>
+                <option value="HIGH">Только HIGH</option>
+              </select>
+            </div>
+          </div>
+          <div id="trafficAlerts"></div>
 
           <div class="panel-head" style="margin-top:2rem;">
             <span>ГРАФИЧЕСКИЕ ОТЧЁТЫ</span>

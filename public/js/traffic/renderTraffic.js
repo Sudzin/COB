@@ -4,6 +4,7 @@ import { getCurrentPcap } from './getCurrentPcap.js';
 import { renderTrafficSummary } from './renderTrafficSummary.js';
 import { renderTrafficCharts } from './renderTrafficCharts.js';
 import { renderFlowTable } from './renderFlowTable.js';
+import { renderSignatureAlerts } from '../render/renderSignatureAlerts.js';
 
 /** Главная отрисовка вкладки «Трафик»: выбор файла, сводка, графики, таблица потоков. */
 export function renderTraffic() {
@@ -43,6 +44,8 @@ export function renderTraffic() {
 
   emptyEl.style.display = 'none';
   bodyEl.style.display = 'block';
+
+  renderSignatureAlerts(cur);
   renderTrafficSummary(cur);
   renderTrafficCharts(cur);
   renderFlowTable(cur);

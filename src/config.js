@@ -15,6 +15,7 @@ module.exports = {
   // В формате syslog нет года, поэтому он задан здесь
   LOG_YEAR: 2026,
   LOG_EXTENSIONS: ['.txt', '.log'],
+  SIGNATURES_DIR: process.env.SIGNATURES_DIR ? path.resolve(process.env.SIGNATURES_DIR) : path.join(ROOT_DIR, 'signatures'),
 
   // Пороги анализа трафика (ЛР №2)
   TRAFFIC: {
