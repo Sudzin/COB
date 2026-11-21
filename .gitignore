@@ -9,3 +9,7 @@ Thumbs.db
 # !logs/.gitkeep
 ROADMAP.md
 Секретики/*
+pcaps/*
+
+ids_alerts.log
+*.zip
