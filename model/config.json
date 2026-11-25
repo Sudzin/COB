@@ -1,0 +1,31 @@
+{
+  "framework": "tensorflow.keras + scikit-learn",
+  "input_dim": 14,
+  "latent_dim": 5,
+  "features": [
+    "pps",
+    "bps",
+    "len_min",
+    "len_max",
+    "len_mean",
+    "len_std",
+    "syn_share",
+    "rst_share",
+    "syn_close_ratio",
+    "tcp_ratio",
+    "udp_ratio",
+    "icmp_ratio",
+    "payload_ratio",
+    "uniq_dst_ports_ratio"
+  ],
+  "mtu_cap": 1514.0,
+  "best_val_loss": 0.002088,
+  "calibration_source": "val_split_20pct",
+  "mse_median": 0.000583,
+  "threshold_p99": 0.025915,
+  "threshold_p995": 0.060073,
+  "fpr_p99_single_sec": 0.0098,
+  "fpr_p99_2sec_streak": 0.0005,
+  "fpr_p995_2sec_streak": 0.0005,
+  "consecutive_alerts": 2
+}

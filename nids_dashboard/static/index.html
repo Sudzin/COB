@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Сетевой монитор</title>
+<style>
+  :root {
+    --bg: #090d14;
+    --surface: #111722;
+    --surface-2: #172030;
+    --border: #1e293b;
+    --border-soft: rgba(148, 163, 184, 0.12);
+    --text: #e2e8f0;
+    --muted: #7f8ea6;
+    --green: #10b981;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --blue: #3b82f6;
+    --cyan: #06b6d4;
+    --indigo: #818cf8;
+    --purple: #a855f7;
+    --slate: #94a3b8;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Тонкие тёмные скроллбары */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #263349; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #384a69; }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Компактная единая шапка */
+  header {
+    height: 48px;
+    flex-shrink: 0;
+    background: #0d131f;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    font-size: 14.5px;
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #475569;
+    flex-shrink: 0;
+  }
+  .dot.live { background: var(--green); box-shadow: 0 0 8px rgba(16,185,129,0.75); }
+  .dot.alert { background: var(--red); box-shadow: 0 0 10px rgba(239,68,68,0.9); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Вкладки в шапке */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: #090d14;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { background: #1e293b; color: #f8fafc; }
+  .badge-cnt {
+    background: var(--red);
+    color: #fff;
+    font-size: 10.5px;
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-family: var(--mono);
+    display: none;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .ctrl-grp {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  input[type="number"], button {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 5px 9px;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  input[type="number"] { width: 78px; font-family: var(--mono); text-align: right; }
+  button { cursor: pointer; font-weight: 600; transition: 0.15s; }
+  button:hover { background: #223047; border-color: #33486b; }
+  button.primary { background: #2563eb; border-color: #3b82f6; color: #fff; padding: 5px 14px; }
+  button.primary:hover { background: #1d4ed8; }
+  button.danger { background: #dc2626; border-color: #ef4444; color: #fff; padding: 5px 14px; }
+  button.danger:hover { background: #b91c1c; }
+  button.sm { padding: 4px 8px; font-size: 11.5px; }
+
+  /* Рабочая область ровно на остаток экрана */
+  main {
+    flex: 1;
+    min-height: 0;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .err-bar {
+    display: none;
+    background: rgba(239,68,68,0.14);
+    border: 1px solid rgba(239,68,68,0.4);
+    color: #fecaca;
+    padding: 6px 12px;
+    border-radius: 7px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .pane {
+    display: none;
+    flex: 1;
+    min-height: 0;
+  }
+  .pane.active {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Карточки */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
+  .card-title { font-size: 12.5px; font-weight: 700; color: #f1f5f9; }
+  .card-sub { font-size: 11px; color: var(--muted); }
+
+  /* ==================== TAB 1: ОБЗОР (100% на 1 экране) ==================== */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .kpi-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .kpi-val { font-size: 18px; font-weight: 700; font-family: var(--mono); margin-top: 2px; }
+  .kpi-sub { font-size: 11px; color: var(--muted); text-align: right; }
+
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 10px;
+    flex: 1.05;
+    min-height: 150px;
+  }
+  .chart-wrap {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+  canvas.chart {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .proto-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    flex: 1.35;
+    min-height: 220px;
+  }
+  .proto-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--blue);
+    border-radius: 9px;
+    padding: 7px 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .proto-card[data-b="TCP"] { border-top-color: var(--green); }
+  .proto-card[data-b="UDP"] { border-top-color: var(--blue); }
+  .proto-card[data-b="QUIC"] { border-top-color: var(--indigo); }
+  .proto-card[data-b="DNS"] { border-top-color: var(--cyan); }
+  .proto-card[data-b="ICMP"] { border-top-color: var(--purple); }
+  .proto-card[data-b="OTHER"] { border-top-color: var(--slate); }
+
+  .proto-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+    flex-shrink: 0;
+  }
+  .proto-name { font-weight: 700; font-size: 12px; }
+  .proto-stat { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .proto-feed {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 4px;
+  }
+  .proto-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 5px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+  }
+
+  /* Цвета Wireshark */
+  .ev-rst { background: rgba(239, 68, 68, 0.18); color: #fca5a5; border-left: 2px solid #ef4444; }
+  .ev-alert { background: rgba(220, 38, 38, 0.3); color: #fecaca; border-left: 3px solid #ff2e4c; font-weight: 700; }
+  .ev-syn { background: rgba(245, 158, 11, 0.16); color: #fde68a; border-left: 2px solid #f59e0b; }
+  .ev-dns { background: rgba(6, 182, 212, 0.13); color: #a5f3fc; border-left: 2px solid #06b6d4; }
+  .ev-quic { background: rgba(129, 140, 248, 0.15); color: #c7d2fe; border-left: 2px solid #818cf8; }
+  .ev-udp { background: rgba(59, 130, 246, 0.13); color: #bfdbfe; border-left: 2px solid #3b82f6; }
+  .ev-tcp { background: rgba(16, 185, 129, 0.10); color: #a7f3d0; border-left: 2px solid #10b981; }
+  .ev-icmp { background: rgba(168, 85, 247, 0.16); color: #e9d5ff; border-left: 2px solid #a855f7; }
+  .ev-arp { background: rgba(148, 163, 184, 0.10); color: #cbd5e1; border-left: 2px solid #94a3b8; }
+
+  /* ==================== TAB 2: ПОТОКИ (жёсткая сетка без прыжков) ==================== */
+  .dir-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .net-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 10px;
+  }
+  .net-right {
+    display: grid;
+    grid-template-rows: 1.55fr 1fr;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .scroll-box {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: 7px;
+    background: #0a0e16;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; table-layout: fixed; }
+  th, td {
+    padding: 5px 7px;
+    text-align: left;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.65);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  th {
+    position: sticky;
+    top: 0;
+    background: #131b2b;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    z-index: 2;
+  }
+  td.mono { font-family: var(--mono); }
+  td.num { text-align: right; font-family: var(--mono); }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 135px 1fr 112px;
+    gap: 8px;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 11.5px;
+  }
+  .bar-track { height: 7px; background: #1e293b; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--blue); border-radius: 4px; transition: width 0.25s; }
+  .bar-fill.hot { background: var(--red); }
+
+  /* ==================== TAB 3: СОБЫТИЯ И ТРЕВОГИ ==================== */
+  .events-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1.75fr 1fr;
+    gap: 10px;
+  }
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; flex-shrink: 0; }
+  .chip {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .chip.active { background: #1d4ed8; border-color: #3b82f6; color: #fff; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  .alert-item {
+    padding: 8px 10px;
+    border-radius: 7px;
+    background: rgba(239, 68, 68, 0.11);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    margin-bottom: 7px;
+    font-size: 11.5px;
+  }
+  .alert-item .a-head { display: flex; justify-content: space-between; font-weight: 700; color: #fca5a5; font-family: var(--mono); }
+  .alert-item .a-body { color: #e2e8f0; margin-top: 3px; font-family: var(--mono); font-size: 11px; }
+
+  /* ==================== TAB 4: ДАМПЫ ==================== */
+  .pcap-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 12px;
+  }
+  .drop-compact {
+    border: 1.5px dashed #33486b;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    color: #93c5fd;
+    cursor: pointer;
+    white-space: nowrap;
+    background: rgba(37,99,235,0.08);
+  }
+  .drop-compact:hover, .drop-compact.drag { border-color: #3b82f6; background: rgba(37,99,235,0.18); }
+  .local-files { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+  .pcap-body {
+    flex: 1;
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pcap-split {
+    flex: 1.25;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="header-left">
+      <div class="brand">
+        <span id="dotStatus" class="dot"></span>
+        <span>Сетевой монитор</span>
+      </div>
+      <nav class="tabs">
+        <button class="tab-btn active" onclick="switchTab('live', this)">Обзор</button>
+        <button class="tab-btn" onclick="switchTab('net', this)">Потоки</button>
+        <button class="tab-btn" onclick="switchTab('events', this)">
+          События и тревоги <span id="tabAlertBadge" class="badge-cnt">0</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('pcap', this)">Дампы</button>
+      </nav>
+    </div>
+
+    <div class="header-right">
+      <label class="ctrl-grp">Порог
+        <input id="inpThresh" type="number" step="0.001" value="0.0259" onchange="applySettings()" />
+      </label>
+      <label class="ctrl-grp">Серия
+        <input id="inpStreak" type="number" min="1" max="10" value="2" style="width:50px;" onchange="applySettings()" />
+      </label>
+      <button id="btnStart" class="primary" onclick="startLive()">▶ Старт</button>
+      <button id="btnStop" class="danger" onclick="stopLive()" style="display:none;">■ Стоп</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="errBar" class="err-bar"></div>
+
+    <!-- ==================== 1. ОБЗОР ==================== -->
+    <section id="pane-live" class="pane active">
+      <div class="kpi-row">
+        <div class="kpi">
+          <div><div class="kpi-lbl">Статус</div><div id="kpiStatus" class="kpi-val" style="color:var(--slate);">ПАУЗА</div></div>
+          <div id="kpiStatusSub" class="kpi-sub">Нажмите «Старт»</div>
+        </div>
+        <div class="kpi">
+          <div><div class="kpi-lbl">Ошибка MSE</div><div id="kpiMse" class="kpi-val">0.00000</div></div>
+          <div id="kpiMseSub" class="kpi-sub">Порог 0.0259</div>
+        </div>
+        <div class="kpi">
+          <div><div class="kpi-lbl">Нагрузка</div><div id="kpiRate" class="kpi-val">0 п/с</div></div>
+          <div id="kpiRateSub" class="kpi-sub">0.00 Мбит/с</div>
+        </div>
+        <div class="kpi">
+          <div><div class="kpi-lbl">Тревоги</div><div id="kpiAlerts" class="kpi-val" style="color:var(--green);">0</div></div>
+          <div class="kpi-sub">подряд ≥ 2 с</div>
+        </div>
+        <div class="kpi">
+          <div><div class="kpi-lbl">Потоки (30 с)</div><div id="kpiFlows" class="kpi-val">0</div></div>
+          <div class="kpi-sub">активных</div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Ошибка автоэнкодера (MSE)</span>
+            <span class="card-sub">Пунктир — порог тревоги</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartMse" class="chart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Скорость трафика</span>
+            <span class="card-sub">Синий — пак/с · Зелёный — Мбит/с</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chartTraffic" class="chart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="proto-grid">
+        <div class="proto-card" data-b="QUIC"><div class="proto-top"><span class="proto-name" style="color:var(--indigo);">HTTPS / QUIC</span><span class="proto-stat" id="ps-QUIC">0 п/с</span></div><div class="proto-feed" id="pf-QUIC"></div></div>
+        <div class="proto-card" data-b="TCP"><div class="proto-top"><span class="proto-name" style="color:var(--green);">TCP (прочее / SYN / RST)</span><span class="proto-stat" id="ps-TCP">0 п/с</span></div><div class="proto-feed" id="pf-TCP"></div></div>
+        <div class="proto-card" data-b="UDP"><div class="proto-top"><span class="proto-name" style="color:var(--blue);">UDP</span><span class="proto-stat" id="ps-UDP">0 п/с</span></div><div class="proto-feed" id="pf-UDP"></div></div>
+        <div class="proto-card" data-b="DNS"><div class="proto-top"><span class="proto-name" style="color:var(--cyan);">DNS / mDNS</span><span class="proto-stat" id="ps-DNS">0 п/с</span></div><div class="proto-feed" id="pf-DNS"></div></div>
+        <div class="proto-card" data-b="ICMP"><div class="proto-top"><span class="proto-name" style="color:var(--purple);">ICMP (Ping)</span><span class="proto-stat" id="ps-ICMP">0 п/с</span></div><div class="proto-feed" id="pf-ICMP"></div></div>
+        <div class="proto-card" data-b="OTHER"><div class="proto-top"><span class="proto-name" style="color:var(--slate);">ARP / Прочее</span><span class="proto-stat" id="ps-OTHER">0 п/с</span></div><div class="proto-feed" id="pf-OTHER"></div></div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. ПОТОКИ (БЕЗ ПРЫЖКОВ) ==================== -->
+    <section id="pane-net" class="pane">
+      <div class="dir-row">
+        <div class="kpi"><div><div class="kpi-lbl">Входящий</div><div id="dirIn" class="kpi-val" style="color:var(--cyan);">0 п/с</div></div><div class="kpi-sub">Интернет → ПК</div></div>
+        <div class="kpi"><div><div class="kpi-lbl">Исходящий</div><div id="dirOut" class="kpi-val" style="color:var(--green);">0 п/с</div></div><div class="kpi-sub">ПК → Интернет</div></div>
+        <div class="kpi"><div><div class="kpi-lbl">Локальная сеть</div><div id="dirLocal" class="kpi-val" style="color:var(--amber);">0 п/с</div></div><div class="kpi-sub">LAN / mDNS / ARP</div></div>
+      </div>
+
+      <div class="net-body">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Активные потоки (последние 30 с)</span>
+            <button id="btnPauseFlows" class="sm" onclick="togglePauseFlows()">⏸ Заморозить таблицу</button>
+          </div>
+          <div id="flowsScroll" class="scroll-box">
+            <table>
+              <colgroup>
+                <col style="width:52px"><col style="width:128px"><col style="width:128px"><col style="width:74px"><col style="width:54px"><col style="width:58px"><col style="width:72px"><col style="width:62px">
+              </colgroup>
+              <thead><tr><th>Напр.</th><th>Источник</th><th>Назначение</th><th>Прот.</th><th>Порт</th><th>Пак.</th><th>Объём</th><th>SYN/RST</th></tr></thead>
+              <tbody id="liveFlowsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="net-right">
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">14 признаков автоэнкодера</span>
+              <span class="card-sub">Факт vs прогноз</span>
+            </div>
+            <div id="liveVectorBox" style="flex:1;min-height:0;overflow-y:auto;padding-right:4px;"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Топ портов назначения</span>
+              <span class="card-sub">Скользящее окно 30 с</span>
+            </div>
+            <div id="livePortsBox" style="flex:1;min-height:0;overflow-y:auto;padding-right:4px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 3. СОБЫТИЯ И ТРЕВОГИ ==================== -->
+    <section id="pane-events" class="pane">
+      <div class="events-grid">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Журнал пакетов (цвета Wireshark)</span>
+            <div style="display:flex;gap:6px;">
+              <button id="btnPauseLog" class="sm" onclick="togglePauseLog()">⏸ Пауза</button>
+              <button class="sm" onclick="clearLiveLog()">Очистить</button>
+            </div>
+          </div>
+          <div class="filter-bar" id="logFilters">
+            <span class="chip active" onclick="setLogFilter('ALL', this)">Все</span>
+            <span class="chip" onclick="setLogFilter('alert', this)">Тревоги</span>
+            <span class="chip" onclick="setLogFilter('rst', this)">RST</span>
+            <span class="chip" onclick="setLogFilter('syn', this)">SYN</span>
+            <span class="chip" onclick="setLogFilter('QUIC', this)">HTTPS/QUIC</span>
+            <span class="chip" onclick="setLogFilter('TCP', this)">TCP</span>
+            <span class="chip" onclick="setLogFilter('UDP', this)">UDP</span>
+            <span class="chip" onclick="setLogFilter('DNS', this)">DNS/mDNS</span>
+            <span class="chip" onclick="setLogFilter('ICMP', this)">ICMP</span>
+            <span class="chip" onclick="setLogFilter('OTHER', this)">ARP</span>
+          </div>
+          <div class="scroll-box">
+            <table>
+              <colgroup>
+                <col style="width:84px"><col style="width:68px"><col style="width:145px"><col style="width:145px"><col style="width:52px"><col>
+              </colgroup>
+              <thead><tr><th>Время</th><th>Прот.</th><th>Источник</th><th>Назначение</th><th>Байт</th><th>Инфо</th></tr></thead>
+              <tbody id="liveLogBody"></tbody>
+            </table>
+          </div>
+          <div class="legend">
+            <span><i class="sw" style="background:#ef4444;"></i>RST / Тревога</span>
+            <span><i class="sw" style="background:#f59e0b;"></i>SYN</span>
+            <span><i class="sw" style="background:#818cf8;"></i>HTTPS / QUIC</span>
+            <span><i class="sw" style="background:#10b981;"></i>TCP</span>
+            <span><i class="sw" style="background:#3b82f6;"></i>UDP</span>
+            <span><i class="sw" style="background:#06b6d4;"></i>DNS / mDNS</span>
+            <span><i class="sw" style="background:#a855f7;"></i>ICMP</span>
+            <span><i class="sw" style="background:#94a3b8;"></i>ARP</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Тревоги нейросети</span>
+            <span class="card-sub">Топ-3 аномальных признака</span>
+          </div>
+          <div id="liveAlertsBox" style="flex:1;min-height:0;overflow-y:auto;">
+            <div style="color:var(--muted);padding:10px;">Тревог пока нет — трафик в пределах нормы.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 4. ДАМПЫ ==================== -->
+    <section id="pane-pcap" class="pane">
+      <div class="pcap-top">
+        <div id="dropzone" class="drop-compact" onclick="document.getElementById('filePcap').click()">
+          📂 Загрузить .pcap / .pcapng
+          <input id="filePcap" type="file" accept=".pcap,.pcapng,.cap" style="display:none;" onchange="uploadPcap(this.files[0])" />
+        </div>
+        <div id="localPcapList" class="local-files"></div>
+        <span id="pcapLoading" style="display:none;color:#60a5fa;font-weight:600;font-size:12px;">⏳ Анализ...</span>
+        <button id="btnExportCsv" class="sm primary" style="display:none;" onclick="exportPcapCsv()">⬇ CSV</button>
+      </div>
+
+      <div id="pcapEmpty" class="card" style="flex:1;align-items:center;justify-content:center;color:var(--muted);">
+        Выберите дамп из папки test/ сверху или перетащите файл .pcap / .pcapng
+      </div>
+
+      <div id="pcapResult" class="pcap-body">
+        <div class="kpi-row">
+          <div class="kpi"><div><div class="kpi-lbl">Файл</div><div id="pFile" class="kpi-val" style="font-size:13.5px;">—</div></div><div id="pWin" class="kpi-sub">—</div></div>
+          <div class="kpi"><div><div class="kpi-lbl">Медиана / Макс MSE</div><div id="pMse" class="kpi-val" style="font-size:15px;">—</div></div><div id="pThr" class="kpi-sub">—</div></div>
+          <div class="kpi"><div><div class="kpi-lbl">Выше порога (1 с)</div><div id="pAbove" class="kpi-val">—</div></div><div class="kpi-sub">окон</div></div>
+          <div class="kpi"><div><div class="kpi-lbl">Тревоги (2+ с)</div><div id="pAlerts" class="kpi-val">—</div></div><div class="kpi-sub">подтверждено</div></div>
+          <div class="kpi"><div><div class="kpi-lbl">Пакетов</div><div id="pPkts" class="kpi-val">—</div></div><div id="pBytes" class="kpi-sub">—</div></div>
+        </div>
+
+        <div class="charts-row" style="flex:0.95;">
+          <div class="card">
+            <div class="card-head"><span class="card-title">MSE по секундам дампа</span><span class="card-sub">Пунктир — порог</span></div>
+            <div class="chart-wrap"><canvas id="chartPcapMse" class="chart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Тревоги в дампе</span><span class="card-sub">Причины срабатывания</span></div>
+            <div id="pcapAlertsBox" style="flex:1;min-height:0;overflow-y:auto;"></div>
+          </div>
+        </div>
+
+        <div class="pcap-split">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Потоки в дампе</span></div>
+            <div class="scroll-box">
+              <table>
+                <colgroup><col style="width:48px"><col style="width:120px"><col style="width:120px"><col style="width:65px"><col style="width:52px"><col style="width:54px"><col style="width:60px"></colgroup>
+                <thead><tr><th>Напр.</th><th>Источник</th><th>Назначение</th><th>Прот.</th><th>Порт</th><th>Пак.</th><th>SYN/RST</th></tr></thead>
+                <tbody id="pcapFlowsBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">События дампа (первые 250)</span></div>
+            <div class="scroll-box">
+              <table>
+                <colgroup><col style="width:76px"><col style="width:60px"><col style="width:125px"><col style="width:125px"><col></colgroup>
+                <thead><tr><th>Время</th><th>Прот.</th><th>Источник</th><th>Назначение</th><th>Инфо</th></tr></thead>
+                <tbody id="pcapEventsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const BUCKETS = ["QUIC", "TCP", "UDP", "DNS", "ICMP", "OTHER"];
+let ws = null;
+let defaultIface = "5";
+let liveHistory = [];
+let liveEvents = [];
+let logPaused = false;
+let flowsPaused = false;
+let logFilter = "ALL";
+let currentThreshold = 0.025915;
+let lastPcapData = null;
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function fmtBytes(b) {
+  if (b >= 1e6) return (b / 1e6).toFixed(2) + " МБ";
+  if (b >= 1e3) return (b / 1e3).toFixed(1) + " КБ";
+  return b + " Б";
+}
+function showErr(msg) {
+  const el = document.getElementById("errBar");
+  if (!msg) { el.style.display = "none"; return; }
+  el.textContent = msg;
+  el.style.display = "block";
+}
+function switchTab(id, btn) {
+  document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("pane-" + id).classList.add("active");
+  btn.classList.add("active");
+  requestAnimationFrame(() => {
+    if (id === "live") { drawMseChart("chartMse", liveHistory, currentThreshold); drawTrafficChart(); }
+    if (id === "pcap" && lastPcapData) { drawMseChart("chartPcapMse", lastPcapData.timeline, lastPcapData.threshold); }
+  });
+}
+
+// ---------------- Графики Canvas2D ----------------
+function drawMseChart(canvasId, series, threshold) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !canvas.offsetWidth) return;
+  const w = canvas.offsetWidth;
+  const h = canvas.offsetHeight;
+  canvas.width = w * devicePixelRatio;
+  canvas.height = h * devicePixelRatio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.clearRect(0, 0, w, h);
+
+  const pad = { l: 48, r: 12, t: 10, b: 20 };
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+  const vals = series.map(d => d.mse);
+  const maxVal = Math.max(threshold * 1.35, ...vals, 0.01);
+
+  ctx.strokeStyle = "rgba(30,41,59,0.85)";
+  ctx.lineWidth = 1;
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#7f8ea6";
+  for (let i = 0; i <= 3; i++) {
+    const y = pad.t + (ph * i) / 3;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+    ctx.fillText((maxVal * (1 - i / 3)).toFixed(4), 2, y + 3);
+  }
+
+  const ty = pad.t + ph * (1 - threshold / maxVal);
+  ctx.save();
+  ctx.strokeStyle = "rgba(239,68,68,0.85)";
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(pad.l, ty); ctx.lineTo(w - pad.r, ty); ctx.stroke();
+  ctx.restore();
+
+  if (!series.length) return;
+  const step = series.length > 1 ? pw / (series.length - 1) : 0;
+
+  // Заливка под линией
+  ctx.beginPath();
+  series.forEach((d, i) => {
+    const x = pad.l + i * step;
+    const y = pad.t + ph * (1 - Math.min(d.mse, maxVal) / maxVal);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(pad.l + (series.length - 1) * step, pad.t + ph);
+  ctx.lineTo(pad.l, pad.t + ph);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ph);
+  grad.addColorStop(0, "rgba(56,189,248,0.22)");
+  grad.addColorStop(1, "rgba(56,189,248,0.0)");
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  series.forEach((d, i) => {
+    const x = pad.l + i * step;
+    const y = pad.t + ph * (1 - Math.min(d.mse, maxVal) / maxVal);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = "#38bdf8";
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  series.forEach((d, i) => {
+    if (d.is_alert || d.mse > threshold) {
+      const x = pad.l + i * step;
+      const y = pad.t + ph * (1 - Math.min(d.mse, maxVal) / maxVal);
+      ctx.beginPath();
+      ctx.arc(x, y, d.is_alert ? 3.8 : 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = d.is_alert ? "#ef4444" : "#f59e0b";
+      ctx.fill();
+    }
+  });
+
+  ctx.fillStyle = "#7f8ea6";
+  ctx.fillText(String(series[0].time || "").slice(-8), pad.l, h - 5);
+  ctx.fillText(String(series[series.length - 1].time || "").slice(-8), w - pad.r - 50, h - 5);
+}
+
+function drawTrafficChart() {
+  const canvas = document.getElementById("chartTraffic");
+  if (!canvas || !canvas.offsetWidth) return;
+  const w = canvas.offsetWidth;
+  const h = canvas.offsetHeight;
+  canvas.width = w * devicePixelRatio;
+  canvas.height = h * devicePixelRatio;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  ctx.clearRect(0, 0, w, h);
+
+  const pad = { l: 42, r: 12, t: 10, b: 20 };
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+  const maxPps = Math.max(40, ...liveHistory.map(d => d.pps || 0));
+
+  ctx.strokeStyle = "rgba(30,41,59,0.85)";
+  ctx.font = "10px monospace";
+  ctx.fillStyle = "#7f8ea6";
+  for (let i = 0; i <= 3; i++) {
+    const y = pad.t + (ph * i) / 3;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+    ctx.fillText(Math.round(maxPps * (1 - i / 3)), 2, y + 3);
+  }
+  if (!liveHistory.length) return;
+  const step = liveHistory.length > 1 ? pw / (liveHistory.length - 1) : 0;
+
+  ctx.beginPath();
+  liveHistory.forEach((d, i) => {
+    const x = pad.l + i * step;
+    const y = pad.t + ph * (1 - (d.pps || 0) / maxPps);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = "#3b82f6";
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+
+  const maxMbps = Math.max(1, ...liveHistory.map(d => d.mbps || 0));
+  ctx.beginPath();
+  liveHistory.forEach((d, i) => {
+    const x = pad.l + i * step;
+    const y = pad.t + ph * (1 - (d.mbps || 0) / maxMbps);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = "#10b981";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+// ---------------- Обновление данных Live ----------------
+function setLogFilter(f, el) {
+  logFilter = f;
+  document.querySelectorAll("#logFilters .chip").forEach(c => c.classList.remove("active"));
+  el.classList.add("active");
+  renderLiveLog();
+}
+function togglePauseLog() {
+  logPaused = !logPaused;
+  document.getElementById("btnPauseLog").textContent = logPaused ? "▶ Продолжить" : "⏸ Пауза";
+}
+function togglePauseFlows() {
+  flowsPaused = !flowsPaused;
+  document.getElementById("btnPauseFlows").textContent = flowsPaused ? "▶ Обновлять таблицу" : "⏸ Заморозить таблицу";
+}
+function clearLiveLog() { liveEvents = []; renderLiveLog(); }
+
+function renderLiveLog() {
+  const tbody = document.getElementById("liveLogBody");
+  const filtered = liveEvents.filter(ev => {
+    if (logFilter === "ALL") return true;
+    if (["alert", "rst", "syn"].includes(logFilter)) return ev.color === logFilter;
+    return ev.bucket === logFilter;
+  }).slice(0, 140);
+  tbody.innerHTML = filtered.map(ev =>
+    `<tr class="ev-${ev.color}">
+      <td class="mono">${esc(ev.time)}</td>
+      <td class="mono"><b>${esc(ev.proto)}</b></td>
+      <td class="mono">${esc(ev.src)}</td>
+      <td class="mono">${esc(ev.dst)}</td>
+      <td class="num">${ev.len}</td>
+      <td title="${esc(ev.info)}">${esc(ev.info)}</td>
+    </tr>`
+  ).join("");
+}
+
+function renderAlertsList(boxId, list) {
+  const box = document.getElementById(boxId);
+  if (!list || !list.length) {
+    box.innerHTML = `<div style="color:var(--muted);padding:10px;">Тревог не зафиксировано — трафик в пределах нормы.</div>`;
+    return;
+  }
+  box.innerHTML = list.slice(0, 40).map(a =>
+    `<div class="alert-item">
+      <div class="a-head"><span>${esc(a.time)}</span><span>MSE = ${Number(a.mse).toFixed(5)}</span></div>
+      <div class="a-body">${esc(a.summary || (a.reasons || []).map(r => `${r.feature} (${r.actual} vs ${r.recon})`).join(", "))}</div>
+    </div>`
+  ).join("");
+}
+
+function handleTick(d) {
+  currentThreshold = d.threshold;
+  liveHistory.push({ time: d.time, mse: d.mse, pps: d.pps, mbps: d.mbps, is_alert: d.is_alert });
+  if (liveHistory.length > 90) liveHistory.shift();
+
+  const dot = document.getElementById("dotStatus");
+  const st = document.getElementById("kpiStatus");
+  if (d.is_alert) {
+    dot.className = "dot alert";
+    st.textContent = "ТРЕВОГА";
+    st.style.color = "var(--red)";
+    document.getElementById("kpiStatusSub").textContent = `${d.streak} с подряд`;
+  } else if (d.above) {
+    dot.className = "dot live";
+    st.textContent = "ВСПЛЕСК";
+    st.style.color = "var(--amber)";
+    document.getElementById("kpiStatusSub").textContent = "1-е окно > порога";
+  } else {
+    dot.className = "dot live";
+    st.textContent = "НОРМА";
+    st.style.color = "var(--green)";
+    document.getElementById("kpiStatusSub").textContent = "онлайн";
+  }
+
+  document.getElementById("kpiMse").textContent = d.mse.toFixed(5);
+  document.getElementById("kpiMse").style.color = d.is_alert ? "var(--red)" : (d.above ? "var(--amber)" : "var(--text)");
+  document.getElementById("kpiMseSub").textContent = `Порог ${d.threshold.toFixed(4)}`;
+  document.getElementById("kpiRate").textContent = `${Math.round(d.pps)} п/с`;
+  document.getElementById("kpiRateSub").textContent = `${d.mbps.toFixed(2)} Мбит/с`;
+  document.getElementById("kpiAlerts").textContent = d.total_alerts;
+  document.getElementById("kpiAlerts").style.color = d.total_alerts > 0 ? "var(--red)" : "var(--green)";
+  document.getElementById("kpiFlows").textContent = (d.flows || []).length;
+
+  const badge = document.getElementById("tabAlertBadge");
+  if (d.total_alerts > 0) { badge.style.display = "inline-block"; badge.textContent = d.total_alerts; }
+
+  drawMseChart("chartMse", liveHistory, d.threshold);
+  drawTrafficChart();
+
+  // 6 протокольных окон
+  BUCKETS.forEach(b => {
+    const info = d.protocols[b] || { pkts: 0, bytes: 0, samples: [] };
+    document.getElementById("ps-" + b).textContent = `${info.pkts} п/с · ${fmtBytes(info.bytes)}`;
+    const feed = document.getElementById("pf-" + b);
+    if (info.samples && info.samples.length) {
+      const html = info.samples.map(s =>
+        `<div class="proto-line ev-${s.color}" title="${esc(s.info)}">${esc(s.time.slice(-8))} ${esc(s.src)} → ${esc(s.dst)} · ${esc(s.info)}</div>`
+      ).join("");
+      feed.innerHTML = html + feed.innerHTML;
+      while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+    }
+  });
+
+  // Журнал событий
+  if (!logPaused && d.events && d.events.length) {
+    liveEvents = [...d.events.slice().reverse(), ...liveEvents].slice(0, 260);
+    renderLiveLog();
+  }
+
+  if (d.is_alert) {
+    const box = document.getElementById("liveAlertsBox");
+    const reasonTxt = (d.reasons || []).map(r => `${r.feature} (${r.actual.toFixed(2)} vs ${r.recon.toFixed(2)})`).join(", ");
+    const html = `<div class="alert-item">
+      <div class="a-head"><span>${esc(d.time)} (${Math.round(d.pps)} п/с)</span><span>MSE = ${d.mse.toFixed(5)}</span></div>
+      <div class="a-body">${esc(reasonTxt)}</div>
+    </div>`;
+    if (box.textContent.includes("Тревог пока нет")) box.innerHTML = html;
+    else box.innerHTML = html + box.innerHTML;
+  }
+
+  // Вкладка 2: Потоки (стабильная, сохраняем скролл)
+  document.getElementById("dirIn").textContent = `${d.directions.IN || 0} п/с`;
+  document.getElementById("dirOut").textContent = `${d.directions.OUT || 0} п/с`;
+  document.getElementById("dirLocal").textContent = `${d.directions.LOCAL || 0} п/с`;
+
+  if (!flowsPaused) {
+    const sc = document.getElementById("flowsScroll");
+    const prevTop = sc.scrollTop;
+    document.getElementById("liveFlowsBody").innerHTML = (d.flows || []).map(f => {
+      const cls = f.rst > 3 ? "ev-rst" : (f.syn > 5 ? "ev-syn" : "");
+      return `<tr class="${cls}">
+        <td class="mono">${esc(f.dir)}</td>
+        <td class="mono">${esc(f.src)}</td>
+        <td class="mono">${esc(f.dst)}</td>
+        <td class="mono">${esc(f.proto)}</td>
+        <td class="num">${f.dport || "—"}</td>
+        <td class="num">${f.pkts}</td>
+        <td class="num">${fmtBytes(f.bytes)}</td>
+        <td class="mono">${f.syn}/${f.rst}</td>
+      </tr>`;
+    }).join("");
+    sc.scrollTop = prevTop;
+  }
+
+  if (d.vector && d.vector.length) {
+    const maxErr = Math.max(0.05, ...d.vector.map(v => v.err));
+    document.getElementById("liveVectorBox").innerHTML = d.vector.map(v => {
+      const pct = Math.min(100, (v.err / maxErr) * 100);
+      return `<div class="bar-row">
+        <span class="mono">${esc(v.feature)}</span>
+        <div class="bar-track"><div class="bar-fill ${v.err > 0.04 ? "hot" : ""}" style="width:${pct.toFixed(1)}%"></div></div>
+        <span class="mono" style="text-align:right;color:var(--muted);">${v.scaled.toFixed(2)} / ${v.recon.toFixed(2)}</span>
+      </div>`;
+    }).join("");
+  }
+
+  // Стабильный топ портов (скользящее окно 30 с)
+  const ports = d.top_ports || [];
+  const maxP = Math.max(1, ...ports.map(x => x.pkts));
+  document.getElementById("livePortsBox").innerHTML = ports.map(x =>
+    `<div class="bar-row" style="grid-template-columns:64px 1fr 56px;">
+      <span class="mono">:${x.port}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${((x.pkts / maxP) * 100).toFixed(1)}%"></div></div>
+      <span class="mono" style="text-align:right;">${x.pkts}</span>
+    </div>`
+  ).join("") || `<div style="color:var(--muted);font-size:12px;">Ожидание трафика...</div>`;
+}
+
+// ---------------- Управление ----------------
+function setRunningUI(running) {
+  document.getElementById("btnStart").style.display = running ? "none" : "inline-block";
+  document.getElementById("btnStop").style.display = running ? "inline-block" : "none";
+  if (!running) {
+    document.getElementById("dotStatus").className = "dot";
+    document.getElementById("kpiStatus").textContent = "ПАУЗА";
+    document.getElementById("kpiStatus").style.color = "var(--slate)";
+    document.getElementById("kpiStatusSub").textContent = "Нажмите «Старт»";
+  }
+}
+
+async function startLive() {
+  showErr("");
+  const res = await fetch("/api/capture/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "tshark", iface: defaultIface }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    showErr(err.detail || "Ошибка запуска мониторинга");
+    return;
+  }
+  setRunningUI(true);
+}
+
+async function stopLive() {
+  await fetch("/api/capture/stop", { method: "POST" });
+  setRunningUI(false);
+}
+
+async function applySettings() {
+  const threshold = parseFloat(document.getElementById("inpThresh").value);
+  const streak = parseInt(document.getElementById("inpStreak").value, 10);
+  const res = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ threshold, streak }),
+  });
+  const d = await res.json();
+  currentThreshold = d.threshold;
+  document.getElementById("kpiMseSub").textContent = `Порог ${d.threshold.toFixed(4)}`;
+}
+
+// ---------------- Дампы ----------------
+async function loadLocalPcaps() {
+  const res = await fetch("/api/pcap/local-list");
+  const d = await res.json();
+  const box = document.getElementById("localPcapList");
+  if (!d.files || !d.files.length) {
+    box.innerHTML = `<span style="color:var(--muted);font-size:12px;">В папке test/ дампов не найдено</span>`;
+    return;
+  }
+  box.innerHTML = d.files.map(f =>
+    `<button class="sm" onclick="analyzeLocalPcap('${esc(f.name)}')">${esc(f.name)}</button>`
+  ).join("");
+}
+
+async function analyzeLocalPcap(name) {
+  showErr("");
+  document.getElementById("pcapLoading").style.display = "inline";
+  try {
+    const res = await fetch("/api/pcap/analyze-local?name=" + encodeURIComponent(name), { method: "POST" });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({ detail: res.statusText }));
+      showErr(e.detail || "Ошибка анализа дампа");
+      return;
+    }
+    renderPcapResult(await res.json());
+  } finally {
+    document.getElementById("pcapLoading").style.display = "none";
+  }
+}
+
+async function uploadPcap(file) {
+  if (!file) return;
+  showErr("");
+  document.getElementById("pcapLoading").style.display = "inline";
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const res = await fetch("/api/pcap/analyze", { method: "POST", body: fd });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({ detail: res.statusText }));
+      showErr(e.detail || "Ошибка анализа дампа");
+      return;
+    }
+    renderPcapResult(await res.json());
+  } finally {
+    document.getElementById("pcapLoading").style.display = "none";
+  }
+}
+
+function renderPcapResult(d) {
+  if (!d.windows) {
+    showErr(d.message || "В дампе не найдено IP-пакетов.");
+    return;
+  }
+  lastPcapData = d;
+  document.getElementById("pcapEmpty").style.display = "none";
+  document.getElementById("pcapResult").style.display = "flex";
+  document.getElementById("btnExportCsv").style.display = "inline-block";
+
+  document.getElementById("pFile").textContent = d.filename;
+  document.getElementById("pWin").textContent = `${d.windows} окон`;
+  document.getElementById("pMse").textContent = `${d.median_mse.toFixed(4)} / ${d.max_mse.toFixed(4)}`;
+  document.getElementById("pThr").textContent = `порог ${d.threshold.toFixed(4)}`;
+  document.getElementById("pAbove").textContent = `${d.above_count} (${(d.above_count / d.windows * 100).toFixed(0)}%)`;
+  document.getElementById("pAlerts").textContent = `${d.alert_count} (${(d.alert_count / d.windows * 100).toFixed(0)}%)`;
+  document.getElementById("pAlerts").style.color = d.alert_count > 0 ? "var(--red)" : "var(--green)";
+  document.getElementById("pPkts").textContent = d.total_pkts.toLocaleString("ru-RU");
+  document.getElementById("pBytes").textContent = fmtBytes(d.total_bytes);
+
+  requestAnimationFrame(() => drawMseChart("chartPcapMse", d.timeline, d.threshold));
+  renderAlertsList("pcapAlertsBox", d.alerts);
+
+  document.getElementById("pcapFlowsBody").innerHTML = (d.flows || []).map(f => {
+    const cls = f.rst > 3 ? "ev-rst" : (f.syn > 5 ? "ev-syn" : "");
+    return `<tr class="${cls}">
+      <td class="mono">${esc(f.dir)}</td>
+      <td class="mono">${esc(f.src)}</td>
+      <td class="mono">${esc(f.dst)}</td>
+      <td class="mono">${esc(f.proto)}</td>
+      <td class="num">${f.dport || "—"}</td>
+      <td class="num">${f.pkts}</td>
+      <td class="mono">${f.syn}/${f.rst}</td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("pcapEventsBody").innerHTML = (d.events || []).map(ev =>
+    `<tr class="ev-${ev.color}">
+      <td class="mono">${esc(ev.time)}</td>
+      <td class="mono"><b>${esc(ev.proto)}</b></td>
+      <td class="mono">${esc(ev.src)}</td>
+      <td class="mono">${esc(ev.dst)}</td>
+      <td title="${esc(ev.info)}">${esc(ev.info)}</td>
+    </tr>`
+  ).join("");
+}
+
+function exportPcapCsv() {
+  if (!lastPcapData) return;
+  const rows = [["t_rel", "time", "pkts", "pps", "mbps", "mse", "above", "is_alert", "reasons"]];
+  lastPcapData.timeline.forEach(r => {
+    rows.push([r.t_rel, r.time, r.pkts, r.pps, r.mbps, r.mse, r.above, r.is_alert, `"${(r.summary || "").replace(/"/g, '""')}"`]);
+  });
+  const blob = new Blob([rows.map(r => r.join(",")).join("\n")], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `report_${lastPcapData.filename}.csv`;
+  a.click();
+}
+
+const dz = document.getElementById("dropzone");
+dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("drag"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("drag"));
+dz.addEventListener("drop", e => {
+  e.preventDefault();
+  dz.classList.remove("drag");
+  if (e.dataTransfer.files.length) uploadPcap(e.dataTransfer.files[0]);
+});
+
+// ---------------- Инициализация ----------------
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws/live`);
+  ws.onmessage = ev => {
+    const d = JSON.parse(ev.data);
+    if (d.type === "tick") handleTick(d);
+    else if (d.type === "error") { showErr(d.message); setRunningUI(false); }
+  };
+  ws.onclose = () => setTimeout(connectWS, 2000);
+}
+
+async function init() {
+  const st = await (await fetch("/api/status")).json();
+  currentThreshold = st.threshold;
+  document.getElementById("inpThresh").value = st.threshold.toFixed(5);
+  document.getElementById("inpStreak").value = st.streak_need;
+  document.getElementById("kpiMseSub").textContent = `Порог ${st.threshold.toFixed(4)}`;
+
+  if (st.history && st.history.length) {
+    liveHistory = st.history;
+    drawMseChart("chartMse", liveHistory, currentThreshold);
+    drawTrafficChart();
+  }
+  if (st.alert_log && st.alert_log.length) renderAlertsList("liveAlertsBox", st.alert_log);
+  setRunningUI(st.running);
+
+  // Автовыбор Wi-Fi адаптера без лишнего выпадающего списка в шапке
+  const ifaces = await (await fetch("/api/interfaces")).json();
+  if (ifaces.interfaces && ifaces.interfaces.length) {
+    const wifi = ifaces.interfaces.find(i => i.label.includes("Беспроводная") || i.label.toLowerCase().includes("wi-fi") || i.id === "5");
+    if (wifi) defaultIface = wifi.id;
+  }
+
+  loadLocalPcaps();
+  connectWS();
+}
+
+window.addEventListener("resize", () => {
+  drawMseChart("chartMse", liveHistory, currentThreshold);
+  drawTrafficChart();
+  if (lastPcapData) drawMseChart("chartPcapMse", lastPcapData.timeline, lastPcapData.threshold);
+});
+init();
+</script>
+</body>
+</html>
